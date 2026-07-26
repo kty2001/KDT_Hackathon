@@ -7,6 +7,37 @@
 
 **관련 분야**: 인공지능, 컴퓨터 비전
 
+### 문서 안내
+
+| 찾는 것 | 문서 |
+|---------|------|
+| 무엇을·왜 만드는가 (기획) | **이 문서** 1~5장 |
+| 어떤 데이터를 쓰고 모델을 어떻게 정했나 | [docs/data.md](docs/data.md) |
+| 실시간 성능·양자화·폼팩터 검토 | [docs/hardware_inference.md](docs/hardware_inference.md) |
+| 계단 검출 방식 정량 검증 (실험) | [scripts/stair_hybrid_baseline.ipynb](scripts/stair_hybrid_baseline.ipynb) |
+| 환경 셋업·실행 방법 | 이 문서 [개발 환경](#개발-환경) |
+
+---
+
+## 현재 진행 상황 (2026-07-26)
+
+**7월 초·중 목표**(아키텍처 설계, 모델 선정·베이스라인, 환경 셋업, 데이터 구축) 중 **환경·데이터·계단 방식 결정**이 완료됐다.
+
+### ✅ 완료
+- **개발 환경**: uv 기반 재현 환경 구축, CUDA 학습 스택 검증 (RTX 4060 Ti / torch 2.13.0+cu130)
+- **데이터 확보**: 공개 데이터셋 4종 다운로드 + 무결성 검증 (짝 없는 파일 0건)
+  - LoLI-Street 33,000쌍 · LOL 500쌍 · StairNet 3,094장(야간 505) · ExDark 7,363장
+  - LoLI-Street에 **YOLO 라벨(person 47,791박스)이 동봉**된 것을 확인 → ③ 보행자 학습을 NightOwls 없이도 착수 가능
+- **계단 검출 방식 확정**: 고전 CV 하이브리드를 정량 검증해 **기각**, YOLO `stairs` 클래스 통합으로 전환
+  - 야간 재현율 0.232 / 오경보율 상한 100% — 안전 기준 미달 ([근거: data.md 4장](docs/data.md))
+
+### 🔄 진행 중 / 다음
+- **② 저조도 개선 베이스라인 학습** (LoLI-Street 33k쌍)
+- **② 단독 720p FPS 실측** — 전체 FPS 예산을 좌우하는 병목 ([근거](docs/hardware_inference.md))
+- **자체 야간 계단 촬영 · `stairs` BBox 라벨링** — 방침 변경으로 **필수 경로**가 됨
+- ③ YOLO 통합 학습 (`person` + `stairs` 단일 모델) baseline
+- NightOwls 등록, AI Hub 인도보행 이용 신청 (절차만 남음 — 보강용)
+
 ---
 
 ## 1. 추진 배경
@@ -39,10 +70,12 @@
 |------|------|------|
 | ① 눈부심 억제(글레어 제어) | 국소 강광원 검출·밝기 저감 | 가로등·전조등 등 강한 광원을 검출해 밝기를 낮춰, 야맹 환자 특유의 광과민으로 인한 시야 방해를 완화 |
 | ② 저조도 개선 | 밝기 복원·대비 강화 | 어두운 영역을 단순히 밝히는 것이 아니라 '대비' 중심으로 처리 |
-| ③ 위험 요소 탐지 | AI 객체탐지(YOLO 계열) + 계단 하이브리드 | 보행자 등 비정형 객체는 YOLO로, 계단·단차는 고전 CV(엣지+기하 검증)로 검출하고 필요 시 YOLO에 `stairs` 클래스를 통합해 보강. 저조도·저해상도 환경에 맞춰 최적화 (→ [data.md](docs/data.md) 4-1 참고) |
+| ③ 위험 요소 탐지 | AI 객체탐지(YOLO 계열) — **단일 모델** | 보행자·계단을 하나의 YOLO 모델로 검출(`stairs` 클래스 통합). 저조도·저해상도 환경에 맞춰 최적화 |
 | ④ 선택적 강조 | 경계선 대비 색 표시 | 검출된 위험 요소의 경계선만 대비 색으로 표시하고 내부는 원본 유지 — 잔존시력을 가리지 않으면서 '봐야 할 것'만 강조 |
 
-> **학습 전략**: 공개 야간·저조도 데이터셋(ExDark, NightOwls 등) 사전학습 + 자체 촬영 야간 데이터 파인튜닝의 2단 구성으로, 소규모 자체 데이터로도 저조도 실효 성능 확보.
+> **③의 설계 근거**: 계단은 '평행한 수평 엣지의 반복'이라는 구조적 사전정보가 강해 고전 CV(엣지+기하 검증)로 라벨링 없이 처리하는 안을 먼저 검토하고 **정량 검증했다**. 결과는 야간 재현율 0.232 · 오경보율 상한 100%로 안전 기준에 미달해 **기각**했고, 딥러닝 단일 모델로 전환했다. (→ [data.md 4장](docs/data.md))
+
+> **학습 전략**: 공개 야간·저조도 데이터셋(NightOwls, ExDark, LoLI-Street 등) 사전학습 + 자체 촬영 야간 데이터 파인튜닝의 2단 구성으로, 소규모 자체 데이터로도 저조도 실효 성능 확보.
 
 ### 개발 범위
 - 대표 위험 요소 2~3종(계단·보행자 중심)에 대한 실시간 파이프라인 프로토타입 구현.
@@ -120,14 +153,6 @@
 
 ---
 
-## 관련 문서
-
-| 문서 | 내용 |
-|------|------|
-| [docs/data.md](docs/data.md) | 공개 야간·저조도 데이터셋 조사·적합성 검토, 단계별 데이터 매핑, 계단 처리 방식 |
-| [docs/hardware_inference.md](docs/hardware_inference.md) | 모바일 추론 런타임·양자화 전략, 골판지 VR 폼팩터 리스크, FPS 병목 분석 |
-| [docs/아이디어_개발_기획서_밤마실_1차.pdf](docs) | 원본 기획서 (수정 금지) |
-
 ## 개발 환경
 
 **패키지 관리는 [uv](https://docs.astral.sh/uv/)를 사용한다.** 의존성은 `pyproject.toml`에 선언하고 `uv.lock`으로 버전을 고정한다.
@@ -140,9 +165,13 @@ uv sync                         # .venv 생성 + 의존성 설치 (lock 기준 �
 
 ### 실행
 ```powershell
-uv run python scripts/xxx.py    # 권장 — 가상환경 자동 사용
-# 또는 .venv\Scripts\activate 후 python 직접 실행
+uv run python scripts/xxx.py                # 권장 — 가상환경 자동 사용
+uv run python scripts/inspect_datasets.py   # 데이터 무결성 검증 (데이터 추가 시마다)
 ```
+
+**노트북**은 `ipykernel`만 설치돼 있다. VS Code에서 `.ipynb`를 열고 커널로 **`.venv`(Python 3.13)** 를 선택하면 된다.
+JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`.
+> ⚠️ 노트북은 데이터 경로를 `작업 디렉토리의 상위/data`로 잡는다. **`scripts/` 를 작업 디렉토리로** 열지 않으면 첫 셀의 경로 assert가 실패한다.
 
 ### 의존성 변경
 ```powershell
@@ -162,11 +191,38 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 | torch / torchvision | 2.13.0+cu130 / 0.28.0+cu130 |
 | ultralytics | 8.4.106 |
 | opencv-python | 5.0.0 |
-| onnxruntime-gpu | 1.28.0 (CUDA·TensorRT EP 인식 확인) |
+| numpy | 2.5.1 |
+| onnxruntime-gpu | 1.28.0 — CUDA·TensorRT EP 인식 확인 (**로컬 검증용**, 폰 배포 경로와 무관) |
 | 학습 GPU | NVIDIA RTX 4060 Ti (VRAM 8GB) |
 
 > **VRAM 8GB 제약**: ② 저조도 개선을 720p 풀해상도로 학습하면 OOM 위험. 패치 학습(256~384 크롭) 전제로 설계할 것 — [hardware_inference.md](docs/hardware_inference.md)의 "내부 처리 해상도 하향" 방침과도 일치.
 
-### 디렉토리
-- `data/`: 학습·평가용 raw 데이터 (git 비추적 — `.gitignore` 처리, 원본 미수정 원칙)
-- `scripts/`: 전처리·학습·추론 스크립트
+---
+
+## 저장소 구조
+
+```
+├── README.md                       기획 + 진행 현황 + 환경 (이 문서)
+├── docs/
+│   ├── data.md                     데이터 확보 현황, 단계별 매핑, 계단 방식 결정 근거
+│   ├── hardware_inference.md       모바일 런타임·양자화, FPS 병목, 폼팩터 리스크
+│   └── 아이디어_개발_기획서_밤마실_1차.pdf   원본 기획서 (수정 금지)
+├── scripts/
+│   ├── inspect_datasets.py         데이터셋 무결성 검증·인벤토리
+│   └── stair_hybrid_baseline.ipynb 계단 고전 CV 검출 정량 평가 (→ 기각 근거)
+├── data/                           raw 데이터 (git 비추적, 원본 미수정)
+├── pyproject.toml / uv.lock        의존성 선언 + 버전 고정
+└── CLAUDE.md                       AI 어시스턴트용 프로젝트 규칙
+```
+
+### `data/` 배치
+
+`.gitignore`로 추적하지 않으므로 팀원이 각자 아래 구조로 내려받아야 한다. 배치 후 `inspect_datasets.py`로 검증할 것.
+
+```
+data/
+├── LoLI-Street/LoLI-Street Dataset/   Train·Val(low/high) + Test + YOLO Annotations
+├── LOLdataset/                        our485/ · eval15/ (각 low/high)
+├── Stair dataset/                     train/ · val/ (각 images/labels)
+└── ExDark/                            ExDark_data/ · ExDark_Annno/ (클래스별 12개 하위 폴더)
+```
