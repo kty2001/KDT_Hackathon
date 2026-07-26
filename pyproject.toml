@@ -1,0 +1,52 @@
+[project]
+name = "bammasil"
+version = "0.1.0"
+description = "밤마실 — 야맹증 저시력자의 야간 보행을 돕는 실시간 AI 시각보조 서비스"
+requires-python = "==3.13.*"
+
+dependencies = [
+    # --- 핵심: 파이프라인 구동 ---
+    "torch>=2.13.0",          # ② 저조도 개선 학습, ③ YOLO 백엔드
+    "torchvision>=0.28.0",
+    "ultralytics>=8.3.0",     # ③ YOLO 탐지·학습·ONNX export
+    "opencv-python>=4.10.0",  # ① 눈부심 억제, ④ 엣지 강조, 계단 하이브리드(Canny→Hough)
+    "numpy>=2.0",
+
+    # --- 평가 지표 ---
+    "scikit-image>=0.25.0",   # ② 평가: PSNR / SSIM
+    "lpips>=0.1.4",           # ② 평가: 지각적 화질
+
+    # --- 배포·최적화 (온디바이스 검증) ---
+    "onnx>=1.17.0",
+    "onnxruntime-gpu>=1.20.0",
+    "onnxslim>=0.1.40",
+
+    # --- 데이터 처리 ---
+    "albumentations>=1.4.0",  # 증강 (주간 → 야간 저조도 합성 포함)
+    "pillow>=11.0.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.67.0",
+    "pandas>=2.2.0",
+    "matplotlib>=3.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.0.0",
+    "ipython>=9.0.0",
+]
+
+[tool.uv]
+package = false  # 애플리케이션 프로젝트 — 패키지로 빌드하지 않음
+
+# torch 계열은 반드시 PyTorch 전용 CUDA 인덱스에서 받는다.
+# explicit = true 이므로 아래 sources 에 명시된 패키지만 이 인덱스를 사용하며,
+# 설치 순서와 무관하게 CPU 빌드가 섞여 들어오지 않는다.
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true

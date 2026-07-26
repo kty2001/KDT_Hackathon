@@ -130,6 +130,43 @@
 
 ## 개발 환경
 
-- Python 기반. 가상환경 활성화 후 작업: `.venv\Scripts\activate` (Windows)
+**패키지 관리는 [uv](https://docs.astral.sh/uv/)를 사용한다.** 의존성은 `pyproject.toml`에 선언하고 `uv.lock`으로 버전을 고정한다.
+
+### 셋업 (팀원 공통)
+```powershell
+winget install astral-sh.uv     # uv 미설치 시 1회
+uv sync                         # .venv 생성 + 의존성 설치 (lock 기준 동일 환경 재현)
+```
+
+### 실행
+```powershell
+uv run python scripts/xxx.py    # 권장 — 가상환경 자동 사용
+# 또는 .venv\Scripts\activate 후 python 직접 실행
+```
+
+### 의존성 변경
+```powershell
+uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
+```
+> `pip install`을 직접 쓰지 말 것 — `uv.lock`과 실제 환경이 어긋나 팀원 간 환경 재현이 깨진다.
+
+### uv를 쓰는 이유
+- **CUDA 빌드 고정**: `pyproject.toml`의 `[tool.uv.sources]`에서 `torch`·`torchvision`을 PyTorch 전용 인덱스(`cu130`)에 `explicit = true`로 못박아 둠. 설치 순서와 무관하게 CPU 빌드가 섞이지 않는다. (pip은 `ultralytics`를 먼저 설치하면 CPU판 torch가 딸려와 GPU 학습이 죽는다)
+- **환경 재현**: `uv.lock`을 커밋해 4인 팀이 동일한 버전 조합을 공유.
+- **속도**: torch CUDA 휠(약 1.8GB) 등 대용량 의존성 설치가 빠름.
+
+### 검증된 구성 (2026-07-26)
+| 항목 | 버전 |
+|------|------|
+| Python | 3.13 (`requires-python = "==3.13.*"`) |
+| torch / torchvision | 2.13.0+cu130 / 0.28.0+cu130 |
+| ultralytics | 8.4.106 |
+| opencv-python | 5.0.0 |
+| onnxruntime-gpu | 1.28.0 (CUDA·TensorRT EP 인식 확인) |
+| 학습 GPU | NVIDIA RTX 4060 Ti (VRAM 8GB) |
+
+> **VRAM 8GB 제약**: ② 저조도 개선을 720p 풀해상도로 학습하면 OOM 위험. 패치 학습(256~384 크롭) 전제로 설계할 것 — [hardware_inference.md](docs/hardware_inference.md)의 "내부 처리 해상도 하향" 방침과도 일치.
+
+### 디렉토리
 - `data/`: 학습·평가용 raw 데이터 (git 비추적 — `.gitignore` 처리, 원본 미수정 원칙)
 - `scripts/`: 전처리·학습·추론 스크립트
