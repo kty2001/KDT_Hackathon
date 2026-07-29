@@ -14,12 +14,14 @@
 | 무엇을·왜 만드는가 (기획) | **이 문서** 1~5장 |
 | 어떤 데이터를 쓰고 모델을 어떻게 정했나 | [docs/data.md](docs/data.md) |
 | 실시간 성능·양자화·폼팩터 검토 | [docs/hardware_inference.md](docs/hardware_inference.md) |
-| 계단 검출 방식 정량 검증 (실험) | [scripts/stair_hybrid_baseline.ipynb](scripts/stair_hybrid_baseline.ipynb) |
+| ② 고전 기법 지형도·속도 실측·**야간 재판정** | [docs/lowlight_classical.md](docs/lowlight_classical.md) |
+| ② arm 결과를 **눈으로 확인** (톤커브·확대비교) | [notebooks/lowlight_arms_review.ipynb](notebooks/lowlight_arms_review.ipynb) |
+| 계단 검출 방식 정량 검증 (실험) | [notebooks/stair_hybrid_baseline.ipynb](notebooks/stair_hybrid_baseline.ipynb) |
 | 환경 셋업·실행 방법 | 이 문서 [개발 환경](#개발-환경) |
 
 ---
 
-## 현재 진행 상황 (2026-07-27)
+## 현재 진행 상황 (2026-07-29)
 
 **7월 초·중 목표**(아키텍처 설계, 모델 선정·베이스라인, 환경 셋업, 데이터 구축) 중 **환경·데이터·계단 방식 결정**이 완료됐다.
 
@@ -33,10 +35,17 @@
 
 ### 🔄 진행 중 / 다음
 - **② 처리 방식 미결 — 고전 톤매핑(A) / 초경량 커브추정(B) / dense 복원망(C)**. 계단과 동일하게 *가설 → 정량 측정 → 결정* 절차를 적용 중이며, **판정 기준을 측정 전에 등록**해 두었다. **측정 전까지 33k 본학습 착수는 보류** ([설계: data.md 2-3](docs/data.md))
-- **② 단독 720p FPS 실측** — 위 방식 결정의 1차 게이트이자 전체 FPS 예산을 좌우하는 병목 ([근거](docs/hardware_inference.md))
+  - **A arm 구현·실측 완료 (7/29)** — 고전 기법 5개 계열을 탐색해 A를 **A1(CLAHE) / A2(AGCWD)** 로 분할하고, 노이즈 억제를 직교 스테이지(`+bf`)로 분리했다. **720p 5~6ms로 1차 게이트 여유 통과** → **② 단독은 A안에서 병목이 아니다.** 야간 표본 재판정 결과 **잠정 우선순위는 `A1+bf`** ([근거: lowlight_classical.md 6-2](docs/lowlight_classical.md))
+- ★ **보유 데이터에 야간·강광원이 없음을 확인 (7/29)** — LoLI-Street는 주간을 어둡게 만든 합성본에 가깝고(GT 200장 중 어두운 장면 0장, `low`가 `high`보다 노이즈 적음) **포화 광원이 0.00%**. 즉 **글레어 억제 성능을 원리적으로 측정할 수 없는 데이터**였다. 실제 야간 대량 소스는 **ExDark뿐**(86%가 어두움) ([근거: data.md 0장](docs/data.md))
+  - **파급**: ② 방식 결정보다 **자체 야간 촬영이 선행**으로 순서가 뒤집혔다. 평가 수단이 없으면 방식을 고를 수 없다 ([2-4 회의 순서 개정](docs/data.md))
+- **② 는 ①글레어 억제를 되돌린다 — 설계 결함** — A1·A2 모두 톤커브가 단조 증가라 강광원을 **원리적으로 억제하지 못한다**(A2는 포화 면적을 최대 15배로 확대). `①→②` 직렬 구조 재검토 또는 highlight compression 계열(Drago·Reinhard·LIME) 도입 필요
+- **② 단독 720p FPS 실측** — A arm 완료, **B·C arm 미실측**. 전체 FPS 예산을 좌우하는 병목 판정은 C 실측까지 열려 있다 ([근거](docs/hardware_inference.md))
+- **시간축(비디오) 검증 미착수** — 플리커·시간축 노이즈 억제는 정지영상 벤치마크로 검출 불가. 자체 야간 **영상** 촬영이 필요 ([lowlight_classical.md 3장](docs/lowlight_classical.md))
 - **자체 야간 계단 촬영 · `stairs` BBox 라벨링** — 방침 변경으로 **필수 경로**가 됨
 - ③ YOLO 통합 학습 (`person` + `stairs` 단일 모델) baseline
-- **NightOwls · AI Hub 인도보행 — ⏸ 보류 (저장공간 부족)**. 취득 절차상의 장벽은 없으나 학습 PC 디스크 여유가 81.7 GiB뿐이라 미설치. 둘 다 보강용이라 사전학습 착수를 막지 않는다 ([사유·대응: data.md 5-1](docs/data.md))
+- **NightOwls Validation — 🔄 다운로드 중 (7/29 착수)**. 기존 "저장공간 부족" 보류 사유는 **C드라이브만 본 오판**이었다 — D드라이브에 349.8 GiB 여유가 있어 해소. 라벨 확보 완료 실측: **51,848장 전량 야간**, `pedestrian` 10,179박스, 라벨 있는 이미지 18.3%
+  - **연속 영상(5 recording, ≈16fps, tracking_id 보유)** 이라 **A3 시간축(플리커·시간축 노이즈) 검증을 자체 촬영 없이 착수 가능** ([취득·위치·라벨: data.md 5-2](docs/data.md))
+- **AI Hub 인도보행 — ⏸ 보류**. 저장공간 사유는 해소됐으나, 대부분 주간이라 **야간화 증강 파이프라인이 선행돼야 한다**는 별개 사유가 유효 ([data.md 5-1](docs/data.md))
 
 ---
 
@@ -171,7 +180,7 @@ uv run python scripts/inspect_datasets.py   # 데이터 무결성 검증 (데이
 
 **노트북**은 `ipykernel`만 설치돼 있다. VS Code에서 `.ipynb`를 열고 커널로 **`.venv`(Python 3.13)** 를 선택하면 된다.
 JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`.
-> ⚠️ 노트북은 데이터 경로를 `작업 디렉토리의 상위/data`로 잡는다. **`scripts/` 를 작업 디렉토리로** 열지 않으면 첫 셀의 경로 assert가 실패한다.
+> ⚠️ 노트북은 데이터 경로를 `작업 디렉토리의 상위/data`로 잡는다. **노트북이 들어 있는 폴더(`scripts/` 또는 `notebooks/`)를 작업 디렉토리로** 열지 않으면 첫 셀의 경로 assert가 실패한다.
 
 ### 의존성 변경
 ```powershell
@@ -206,11 +215,19 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 ├── docs/
 │   ├── data.md                     데이터 확보 현황, 단계별 매핑, 계단 방식 결정 근거
 │   ├── hardware_inference.md       모바일 런타임·양자화, FPS 병목, 폼팩터 리스크
-│   └── 아이디어_개발_기획서_밤마실_1차.pdf   원본 기획서 (수정 금지)
+│   ├── lowlight_classical.md       ② 고전 기법 지형도·720p 속도 실측, A arm 재정의 제안
+│   └── 아이디어기획서_밤마실_20260729.pdf    원본 기획서 (수정 금지)
 ├── scripts/
 │   ├── inspect_datasets.py         데이터셋 무결성 검증·인벤토리
+│   ├── probe_classical.py          ② 고전 기법 속도 프로브 (→ lowlight_classical.md 2장)
+│   ├── lowlight.py                 ② 고전 arm 구현 (A1·A2·D1·R1·L1) + arm 레지스트리
+│   ├── compare_lowlight.py         ② arm 비교 하네스 (속도·화질·노이즈증폭·대조표)
+│   └── night_eval.py               ② 야간 표본 평가 (풀 프로파일·글레어·대비·노이즈·속도)
+├── notebooks/
+│   ├── lowlight_arms_review.ipynb  ② arm 육안 검토 (톤커브·강광원/암부 확대·지표)
 │   └── stair_hybrid_baseline.ipynb 계단 고전 CV 검출 정량 평가 (→ 기각 근거)
 ├── data/                           raw 데이터 (git 비추적, 원본 미수정)
+├── outputs/                        실험 산출물 (git 비추적)
 ├── pyproject.toml / uv.lock        의존성 선언 + 버전 고정
 └── CLAUDE.md                       AI 어시스턴트용 프로젝트 규칙
 ```
@@ -224,5 +241,15 @@ data/
 ├── LoLI-Street/LoLI-Street Dataset/   Train·Val(low/high) + Test + YOLO Annotations
 ├── LOLdataset/                        our485/ · eval15/ (각 low/high)
 ├── Stair dataset/                     train/ · val/ (각 images/labels)
-└── ExDark/                            ExDark_data/ · ExDark_Annno/ (클래스별 12개 하위 폴더)
+├── ExDark/                            ExDark_data/ · ExDark_Annno/ (클래스별 12개 하위 폴더)
+└── NightOwls/  → D:\datasets\NightOwls  (Junction)   Validation 51,848장 + 라벨 JSON
 ```
+
+> **NightOwls 는 D드라이브에 있다.** 53.5 GiB 라 C 여유(77 GiB)로는 다운로드+해제를 감당할 수 없어
+> `D:\datasets\NightOwls\` 에 두고 Junction 으로 `data/NightOwls` 에 연결했다. 스크립트 경로 분기는 불필요하다.
+>
+> ```powershell
+> New-Item -ItemType Junction -Path "<저장소>\data\NightOwls" -Target "D:\datasets\NightOwls"
+> ```
+>
+> 취득 명령·라벨 구성·선택 해제 방침은 [data.md 5-2](docs/data.md) 참고.
