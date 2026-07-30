@@ -16,10 +16,47 @@
 | 실시간 성능·양자화·폼팩터 검토 | [docs/hardware_inference.md](docs/hardware_inference.md) |
 | ② 고전 기법 지형도·속도 실측·**야간 재판정** | [docs/lowlight_classical.md](docs/lowlight_classical.md) |
 | ② arm 결과를 **눈으로 확인** (톤커브·확대비교) | [notebooks/lowlight_arms_review.ipynb](notebooks/lowlight_arms_review.ipynb) |
+| ② 고전 기법을 **LOL 원본과 나란히 비교** (+ GT 기반 PSNR/SSIM) | [notebooks/lowlight_lol_review.ipynb](notebooks/lowlight_lol_review.ipynb) |
 | 계단 검출 방식 정량 검증 (실험) | [notebooks/stair_hybrid_baseline.ipynb](notebooks/stair_hybrid_baseline.ipynb) |
 | 환경 셋업·실행 방법 | 이 문서 [개발 환경](#개발-환경) |
 
 ---
+
+## 실행 방법
+
+### 0. 사전 준비
+```powershell
+winget install astral-sh.uv     # uv 미설치 시 1회
+```
+
+### 1. 환경 생성
+```powershell
+uv sync                         # .venv 생성 + 의존성 설치 (uv.lock 기준 동일 환경 재현)
+```
+`uv sync`는 가상환경 활성화 없이 `.venv`를 자동 사용한다. 이후 모든 Python 실행은 `uv run`으로 한다.
+
+### 2. 스크립트 실행
+```powershell
+uv run python scripts/inspect_datasets.py         # data/ 배치 후 무결성 검증 (최초 1회)
+uv run python scripts/probe_classical.py          # ② 고전 기법 속도 프로브
+uv run python scripts/compare_lowlight.py --dataset lol   # ② arm 비교 (속도·PSNR/SSIM·노이즈)
+uv run python scripts/night_eval.py --profile-only        # ② 야간 표본 밝기·포화 프로파일만
+uv run python scripts/night_eval.py                       # ② 야간 표본 목적 축 전체 평가
+```
+
+### 3. 노트북 실행
+VS Code에서 `.ipynb`를 열고 커널로 **`.venv`(Python 3.13)** 를 선택한다.
+> ⚠️ 작업 디렉토리를 **노트북이 든 폴더(`notebooks/`)로 열 것** — 데이터 경로를 `../data`로 잡는다.
+
+| 노트북 | 필요 데이터 |
+|--------|-------------|
+| [lowlight_lol_review.ipynb](notebooks/lowlight_lol_review.ipynb) | **LOL만 있으면 실행 가능** |
+| [lowlight_arms_review.ipynb](notebooks/lowlight_arms_review.ipynb) | ExDark · StairNet · LoLI-Street |
+| [stair_hybrid_baseline.ipynb](notebooks/stair_hybrid_baseline.ipynb) | StairNet |
+
+JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`.
+
+> 세부 사항(uv를 쓰는 이유·의존성 변경 방법·검증된 버전 구성)은 [개발 환경](#개발-환경) 참고.
 
 ## 현재 진행 상황 (2026-07-29)
 
@@ -225,6 +262,7 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 │   └── night_eval.py               ② 야간 표본 평가 (풀 프로파일·글레어·대비·노이즈·속도)
 ├── notebooks/
 │   ├── lowlight_arms_review.ipynb  ② arm 육안 검토 (톤커브·강광원/암부 확대·지표)
+│   ├── lowlight_lol_review.ipynb   ② 고전 arm 전체 × LOL 원본/GT 비교 (LOL만 있으면 실행 가능)
 │   └── stair_hybrid_baseline.ipynb 계단 고전 CV 검출 정량 평가 (→ 기각 근거)
 ├── data/                           raw 데이터 (git 비추적, 원본 미수정)
 ├── outputs/                        실험 산출물 (git 비추적)
