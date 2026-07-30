@@ -16,7 +16,7 @@
 | 실시간 성능·양자화·폼팩터 검토 | [docs/hardware_inference.md](docs/hardware_inference.md) |
 | ② 고전 기법 지형도·속도 실측·**야간 재판정** | [docs/lowlight_classical.md](docs/lowlight_classical.md) |
 | ② arm 결과를 **눈으로 확인** (톤커브·확대비교) | [notebooks/lowlight_arms_review.ipynb](notebooks/lowlight_arms_review.ipynb) |
-| ② 고전 기법을 **LOL 원본과 나란히 비교** (+ GT 기반 PSNR/SSIM) | [notebooks/lowlight_lol_review.ipynb](notebooks/lowlight_lol_review.ipynb) |
+| ② arm 10개의 **차이 설명** + LOL 원본/GT 비교 + **자체 촬영 야간 사진 전 arm 적용** | [notebooks/lowlight_lol_review.ipynb](notebooks/lowlight_lol_review.ipynb) |
 | 계단 검출 방식 정량 검증 (실험) | [notebooks/stair_hybrid_baseline.ipynb](notebooks/stair_hybrid_baseline.ipynb) |
 | 환경 셋업·실행 방법 | 이 문서 [개발 환경](#개발-환경) |
 
@@ -50,7 +50,7 @@ VS Code에서 `.ipynb`를 열고 커널로 **`.venv`(Python 3.13)** 를 선택�
 
 | 노트북 | 필요 데이터 |
 |--------|-------------|
-| [lowlight_lol_review.ipynb](notebooks/lowlight_lol_review.ipynb) | **LOL만 있으면 실행 가능** |
+| [lowlight_lol_review.ipynb](notebooks/lowlight_lol_review.ipynb) | **LOL** (1~9절) + `data/sample_image.png` (10절) |
 | [lowlight_arms_review.ipynb](notebooks/lowlight_arms_review.ipynb) | ExDark · StairNet · LoLI-Street |
 | [stair_hybrid_baseline.ipynb](notebooks/stair_hybrid_baseline.ipynb) | StairNet |
 
@@ -262,7 +262,7 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 │   └── night_eval.py               ② 야간 표본 평가 (풀 프로파일·글레어·대비·노이즈·속도)
 ├── notebooks/
 │   ├── lowlight_arms_review.ipynb  ② arm 육안 검토 (톤커브·강광원/암부 확대·지표)
-│   ├── lowlight_lol_review.ipynb   ② 고전 arm 전체 × LOL 원본/GT 비교 (LOL만 있으면 실행 가능)
+│   ├── lowlight_lol_review.ipynb   ② arm 차이 설명 + LOL 원본/GT 비교 + 자체 촬영본(10절)
 │   └── stair_hybrid_baseline.ipynb 계단 고전 CV 검출 정량 평가 (→ 기각 근거)
 ├── data/                           raw 데이터 (git 비추적, 원본 미수정)
 ├── outputs/                        실험 산출물 (git 비추적)
