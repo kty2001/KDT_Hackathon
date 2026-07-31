@@ -27,7 +27,8 @@ import cv2
 import numpy as np
 from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
-from lowlight import ARM_NAMES, build, noise_amplification
+from lowlight import ARM_NAMES, build
+from metrics import cell, flat_dark_mask, luma, noise_absolute, noise_amplification
 
 ROOT = Path(__file__).resolve().parent.parent
 GATE_MS = 20.0  # data.md 2-3-3 1차 게이트
@@ -91,17 +92,29 @@ def measure_speed(arm, frame: np.ndarray, runs: int) -> float:
 
 def measure_quality(arm, pairs) -> dict[str, float]:
     psnr, ssim, amp, bright = [], [], [], []
+    nl_b, nl_a, nc_b, nc_a = [], [], [], []
     for _, low, high in pairs:
         out = arm(low)
         psnr.append(peak_signal_noise_ratio(high, out, data_range=255))
         ssim.append(structural_similarity(high, out, channel_axis=2, data_range=255))
         amp.append(noise_amplification(low, out))
         bright.append(float(out.mean()) / (float(low.mean()) + 1e-6))
+        # 신 노이즈 지표 — 평활 암부에 국한한 절대 σ. 마스크는 입력에서 고정한다
+        # (arm 마다 다른 화소를 재면 노이즈를 키울수록 좋게 나오는 역전이 생긴다).
+        flat = flat_dark_mask(luma(low))
+        sl_b, sc_b = noise_absolute(low, flat)
+        sl_a, sc_a = noise_absolute(out, flat)
+        nl_b.append(sl_b), nl_a.append(sl_a)
+        nc_b.append(sc_b), nc_a.append(sc_a)
     return {
         "psnr": float(np.mean(psnr)),
         "ssim": float(np.mean(ssim)),
-        "noise_amp": float(np.mean(amp)),
+        "noise_amp": float(np.mean(amp)),  # 구 지표 (결함) — metrics.py 참고
         "gain": float(np.mean(bright)),
+        "noise_luma_before": float(np.mean(nl_b)),
+        "noise_luma_after": float(np.mean(nl_a)),
+        "noise_chroma_before": float(np.mean(nc_b)),
+        "noise_chroma_after": float(np.mean(nc_a)),
     }
 
 
@@ -139,24 +152,45 @@ def main():
     print(f"데이터셋 {args.dataset} · 쌍 {len(pairs)}개 · 속도 {w}x{h} median of {args.runs}")
     print(f"게이트: ② 단독 <= {GATE_MS:.0f}ms/frame (data.md 2-3-3)\n")
 
-    print(f"{'arm':<8}{'ms':>8}{'FPS':>8}{'게이트':>8}{'PSNR':>8}{'SSIM':>8}{'노이즈증폭':>12}{'밝기이득':>10}")
-    print("-" * 74)
+    print(cell("arm", 8, "<") + cell("ms", 8) + cell("FPS", 8) + cell("게이트", 8)
+          + cell("PSNR", 8) + cell("SSIM", 8) + cell("밝기이득", 10)
+          + "│" + cell("[신] 노이즈 절대σ", 22, "^")
+          + "║" + cell("[구] 노이즈증폭", 16))
+    print(cell("", 58) + "│" + cell("휘도", 11) + cell("색", 11)
+          + "║" + cell("(결함)", 16))
+    print("-" * 98)
     results = []
+    base = None
     for arm in arms:
         ms = measure_speed(arm, speed_frame, args.runs)
         q = measure_quality(arm, pairs)
         results.append((arm, ms, q))
+        if base is None:
+            base = q
         fps = "—" if ms < 0.05 else f"{1000 / ms:.1f}"  # 무처리 arm 은 측정 의미 없음
-        print(f"{arm.name:<8}{ms:>8.2f}{fps:>8}"
-              f"{('OK' if ms <= GATE_MS else '탈락'):>8}"
-              f"{q['psnr']:>8.2f}{q['ssim']:>8.3f}{q['noise_amp']:>12.3f}{q['gain']:>10.2f}x")
+        print(cell(arm.name, 8, "<") + cell(f"{ms:.2f}", 8) + cell(fps, 8)
+              + cell("OK" if ms <= GATE_MS else "탈락", 8)
+              + cell(f"{q['psnr']:.2f}", 8) + cell(f"{q['ssim']:.3f}", 8)
+              + cell(f"{q['gain']:.2f}x", 10)
+              + "│" + cell(f"{q['noise_luma_after']:.2f}", 11)
+              + cell(f"{q['noise_chroma_after']:.2f}", 11)
+              + "║" + cell(f"{q['noise_amp']:.3f}", 16))
+    # 신 노이즈는 정규화하지 않으므로 입력 자체의 σ 가 기준선이다
+    print(cell("(입력)", 58, "<") + "│"
+          + cell(f"{base['noise_luma_before']:.2f}", 11)
+          + cell(f"{base['noise_chroma_before']:.2f}", 11)
+          + "║" + cell("1.000", 16))
 
     print("\narm 구성")
     for arm in arms:
         print(f"  {arm.name:<8}{arm.describe()}")
 
     print("\n읽는 법")
-    print("  노이즈증폭  밝기이득으로 정규화한 σ 비. >1.0 이면 신호보다 노이즈를 더 키운 것 (H2)")
+    print("  [신] 노이즈  평활 암부에 국한한 **절대** σ. (입력) 행보다 크면 노이즈를 드러낸 것.")
+    print("               H2 판정은 이 두 열로 한다. 휘도와 색이 서로 다른 arm 을 가리킨다 —")
+    print("               A1·A2 는 LAB `L` 만 건드려 색 σ 가 그대로이고, D1·R1·L1 은 색까지 키운다")
+    print("  [구] 노이즈증폭  밝기이득 정규화 σ 비 — **육안과 반대 결론을 내는 결함 지표**.")
+    print("               문서 6-1·6-2 수치와의 대조용으로만 남긴다 (→ metrics.py)")
     print("  PSNR/SSIM   GT 재현도일 뿐 탐지 성능이 아니다 (H1). 채택 근거로 쓰지 말 것")
 
     if not args.no_sheet:

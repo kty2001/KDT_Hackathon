@@ -6,11 +6,15 @@
     여기서는 보유 데이터셋에서 진짜 어두운 장면만 골라 다시 잰다.
 
 paired GT 가 없으므로 PSNR/SSIM 은 재지 않는다. 대신 **GT 없이 잴 수 있고
-프로젝트 목적에 직접 대응하는 축**만 본다.
+프로젝트 목적에 직접 대응하는 축**만 본다. 지표 정의는 전부 `metrics.py` 에 있다.
 
-    글레어      상위 1% 밝기·포화율의 전후 변화  — 목적은 '억제'(①)
-    대비        밝기이득으로 정규화한 암부 국소대비 이득 — 목적은 '밝기 아닌 대비'
-    노이즈      밝기이득으로 정규화한 σ 증폭률 — 가설 H2
+    글레어      광원(휘도>=235) 코어 밝기의 전후 변화 + 포화 면적 — 목적은 '억제'(①)
+    대비        같은 밝기의 감마 영상 대비 국소대비 비 — 목적은 '밝기 아닌 대비'
+    노이즈      평활 암부 국한 절대 σ (휘도·색 분리) — 가설 H2
+
+세 축 모두 **절대 기준**이다. 예전 정의(상위 1% 백분위 · 밝기이득 정규화)는 영상마다
+재는 대상이 달라져 육안과 어긋났다 — 표의 ║ 오른쪽에 대조용으로만 남아 있다.
+경위는 `metrics.py` 모듈 docstring 과 `docs/lowlight_classical.md` 6-4 참고.
 
 사용법:
     uv run python scripts/night_eval.py                    # 프로파일 + 평가
@@ -27,7 +31,13 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from lowlight import ARM_NAMES, build, estimate_noise
+from lowlight import ARM_NAMES, build
+# 지표 정의는 metrics.py 한 곳에 있다 (구·신 지표와 그 결함 설명 포함).
+# 기존 import 경로(`from night_eval import dark_mask, local_rms, luma, measure`)를
+# 노트북이 쓰고 있어 그대로 재수출한다.
+from metrics import (  # noqa: F401
+    LAMP_MIN, LAMP_MIN_PX, cell, dark_mask, estimate_noise, local_rms, luma, measure,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -60,28 +70,6 @@ def list_images(root: Path) -> list[Path]:
     if not root.is_dir():
         return []
     return sorted(p for p in root.rglob("*") if p.suffix.lower() in EXTS)
-
-
-def luma(bgr: np.ndarray) -> np.ndarray:
-    return cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
-
-
-def local_rms(L: np.ndarray, mask: np.ndarray) -> float:
-    """국소 대비 — 9x9 이웃 표준편차의 평균."""
-    m = cv2.blur(L, (9, 9))
-    var = cv2.blur(L * L, (9, 9)) - m * m
-    return float(np.sqrt(np.maximum(var, 0))[mask].mean())
-
-
-def dark_mask(L: np.ndarray) -> np.ndarray:
-    """암부 마스크 — **순수 검정(크러시)은 제외한다.**
-
-    실제 야간 영상은 암부의 상당 부분이 0 으로 뭉개져 있다. 그 영역은 복원할
-    정보가 자체가 없어서 포함하면 통계를 지배해버린다(밝기비가 0/0 으로 발산).
-    신호가 조금이라도 남아 있는 어두운 영역만 본다.
-    """
-    m = (L >= 3) & (L <= np.percentile(L, 60))
-    return m if m.sum() >= 100 else (L <= np.percentile(L, 60))
 
 
 # --------------------------------------------------------------------------
@@ -152,94 +140,44 @@ def collect_night(pools, dark_by_pool, max_luma, n, rng) -> list[tuple[str, Path
 # --------------------------------------------------------------------------
 
 
-LAMP_MIN = 235.0  # 광원 판정 절대 임계 (문서 lowlight_classical.md 7장)
-LAMP_MIN_PX = 30  # 이보다 광원 화소가 적으면 그 표본은 코어 집계에서 제외
-
-
-def measure(arm, samples, lamp_min: float = LAMP_MIN, lamp_min_px: int = LAMP_MIN_PX) -> dict[str, float]:
-    """arm 을 목적 축(글레어·대비·노이즈)에서 평가한다.
-
-    글레어는 **두 가지 방식**으로 잰다 (`glare_*` 와 `glare_core_*`).
-    `glare_*`(상위 1% 백분위)는 영상이 매우 어두우면(평균밝기가 한 자릿수인 경우)
-    임계 자체가 휘도 40~50대까지 내려가, 실제 광원이 아니라 '덜 어두운 배경'을
-    표본에 넣는다 — 자체 촬영 야간 사진(평균밝기 7.3)에서 이 문제로 D1 의
-    하이라이트 억제가 '증폭'으로 오보고됐다 (→ `lowlight_classical.md` 7장).
-
-    `glare_core_*`는 **절대 휘도(`lamp_min`)로 광원을 고정**해 이 문제를 피한다.
-    영상 밝기와 무관하게 항상 같은 대상(실제 광원)을 재므로, 어두운 영상에서도
-    유효하다. `sat_*`(포화 면적, 이미 절대 임계 250 기반)와 함께 보면
-    **코어 밝기**(광원 자체가 얼마나 밝아지는가)와 **번짐**(포화로 뭉개지는 면적)을
-    분리해서 읽을 수 있다 — 둘은 서로 다른 종류의 피해다.
-
-    `glare_before`/`glare_after` 등 기존 키는 과거 문서 수치(6-2·6-3)와의 대조를
-    위해 그대로 남긴다. **새 판정은 `glare_core_*` 를 우선할 것.**
-    """
-    glare_b, glare_a, sat_b, sat_a = [], [], [], []
-    core_b, core_a = [], []
-    c_ratio, gains, n_amp = [], [], []
-    for src in samples:
-        L = luma(src)
-        out_img = arm(src)
-        O = luma(out_img)
-
-        hi = L >= np.percentile(L, 99)  # 강광원 후보 = 상위 1% — 어두운 영상에서 취약 (위 docstring)
-        glare_b.append(L[hi].mean())
-        glare_a.append(O[hi].mean())
-        sat_b.append(100.0 * (L >= 250).mean())
-        sat_a.append(100.0 * (O >= 250).mean())
-
-        # ★ 절대 임계 기반 코어 — 입력에서 고른 광원 화소 위치를 출력에도 그대로
-        # 적용한다(재선택하지 않는다). 같은 화소가 어디로 가는지를 봐야 "억제/증폭"
-        # 판정이 의미가 있다. 표본에 광원 자체가 없으면(개수 미달) 이 표본은 뺀다.
-        lamp = L >= lamp_min
-        if int(lamp.sum()) >= lamp_min_px:
-            core_b.append(float(np.median(L[lamp])))
-            core_a.append(float(np.median(O[lamp])))
-
-        dark = dark_mask(L)
-        c_ratio.append(local_rms(O, dark) / (local_rms(L, dark) + 1e-6))
-        # 정규화는 전역 밝기이득으로 한다 — 암부 평균은 야간에서 0 에 붙어 발산한다
-        gain = (float(O.mean()) + 1e-6) / (float(L.mean()) + 1e-6)
-        gains.append(gain)
-        n_amp.append((estimate_noise(out_img) + 1e-6) / (estimate_noise(src) + 1e-6) / gain)
-
-    cr, br = float(np.mean(c_ratio)), float(np.mean(gains))
-    core_n = len(core_b)
-    return {
-        "glare_before": float(np.mean(glare_b)),
-        "glare_after": float(np.mean(glare_a)),
-        "sat_before": float(np.mean(sat_b)),
-        "sat_after": float(np.mean(sat_a)),
-        # core_n == 0 이면 이 표본 풀 전체에 광원(>=lamp_min)이 없다는 뜻 —
-        # 두 값 다 nan 이며, 호출부가 "—" 같은 표시로 걸러야 한다.
-        "glare_core_before": float(np.mean(core_b)) if core_b else float("nan"),
-        "glare_core_after": float(np.mean(core_a)) if core_a else float("nan"),
-        "glare_core_n": core_n,
-        "contrast": cr,
-        "gain": br,
-        "norm_contrast": cr / br,
-        "noise_amp": float(np.mean(n_amp)),
-    }
-
-
 def _print_table(arms, samples, title: str) -> None:
+    """목적 축 3개를 **신 지표 우선**으로 표시한다.
+
+    구 지표(강광원 백분위·정규화대비·노이즈증폭)는 문서 6-2·6-3 수치와 대조하기
+    위해 오른쪽 블록에 남겨 두되, **판정은 왼쪽 신 지표로 한다.**
+    세 지표의 결함과 교체 근거는 `metrics.py` 모듈 docstring 참고.
+    """
     print(f"\n[{title}]  n={len(samples)}")
-    print(f"{'arm':<8}{'강광원(백분위) 전':>17}{'후':>8}{'변화':>8}"
-          f"{'포화율 전':>11}{'후':>8}{'대비배율':>10}{'밝기배율':>10}"
-          f"{'정규화대비':>12}{'노이즈증폭':>12}"
-          f"{'코어(절대 >=' + f'{LAMP_MIN:.0f})':>16}{'표본':>7}")
-    print("-" * 118)
+    print(cell("arm", 8, "<") + "│" + cell("[신] 노이즈 절대σ", 22, "^")
+          + "│" + cell("[신] 대비", 10) + "│" + cell(f"광원코어(>={LAMP_MIN:.0f})", 17)
+          + cell("표본", 8) + "│" + cell("포화율 전", 11) + cell("후", 8)
+          + "║" + cell("[구] 강광원Δ", 14) + cell("[구] 정규화대비", 16)
+          + cell("[구] 노이즈증폭", 16))
+    print(cell("", 8) + "│" + cell("휘도", 11) + cell("색", 11)
+          + "│" + cell("감마대비", 10) + "│" + cell("전→후", 17) + cell("", 8)
+          + "│" + cell("", 11) + cell("", 8) + "║" + cell("(결함 — 대조용)", 46, "^"))
+    print("-" * 134)
     for arm in arms:
         r = measure(arm, samples)
         core_n = r["glare_core_n"]
         core = ("—" if core_n == 0 else
                 f"{r['glare_core_before']:.0f}→{r['glare_core_after']:.0f}")
-        print(f"{arm.name:<8}{r['glare_before']:>17.1f}{r['glare_after']:>8.1f}"
-              f"{r['glare_after'] - r['glare_before']:>+8.1f}"
-              f"{r['sat_before']:>10.2f}%{r['sat_after']:>7.2f}%"
-              f"{r['contrast']:>9.2f}x{r['gain']:>9.2f}x"
-              f"{r['norm_contrast']:>12.2f}{r['noise_amp']:>12.3f}"
-              f"{core:>16}{core_n:>4}/{len(samples)}")
+        print(cell(arm.name, 8, "<") + "│"
+              + cell(f"{r['noise_luma_after']:.2f}", 11)
+              + cell(f"{r['noise_chroma_after']:.2f}", 11) + "│"
+              + cell(f"{r['contrast_gain']:.2f}", 10) + "│"
+              + cell(core, 17) + cell(f"{core_n}/{len(samples)}", 8) + "│"
+              + cell(f"{r['sat_before']:.2f}%", 11) + cell(f"{r['sat_after']:.2f}%", 8)
+              + "║" + cell(f"{r['glare_after'] - r['glare_before']:+.1f}", 14)
+              + cell(f"{r['norm_contrast']:.2f}", 16)
+              + cell(f"{r['noise_amp']:.3f}", 16))
+
+    # 입력 자체의 절대 노이즈 — 신 지표는 정규화하지 않으므로 기준선이 필요하다
+    base = measure(build("none"), samples)
+    print(cell("(입력)", 8, "<") + "│"
+          + cell(f"{base['noise_luma_before']:.2f}", 11)
+          + cell(f"{base['noise_chroma_before']:.2f}", 11) + "│"
+          + cell("1.00", 10) + "│" + cell("기준선", 17))
 
 
 GATE_MS = 20.0  # data.md 2-3-3 1차 게이트 — ② 단독 720p 기준
@@ -294,17 +232,22 @@ def evaluate(arms, night, by_pool: bool = True) -> None:
             tag = "합성 감광 — 대조군" if pool == "loli_val_low" else "실제 촬영"
             _print_table(arms, pools[pool], f"{pool} ({tag})")
 
-    print("\n  강광원(백분위) 변화  목적은 '억제'다. 양수면 눈부심을 키운 것 (→ ① 과 상충)")
-    print(f"                     ⚠️ 평균밝기가 낮은 풀(한 자릿수)에서는 상위 1% 임계 자체가")
-    print(f"                     휘도 40~50대로 내려가 광원(>={LAMP_MIN:.0f})을 못 잡을 수 있다.")
-    print(f"                     그럴 때는 '코어(절대)' 열을 볼 것 — 이 열이 우선한다")
-    print(f"  코어(절대 >={LAMP_MIN:.0f})  광원 화소만 고정해 전→후를 본다. 낮아지면 실제 억제.")
-    print("                     '—' 는 그 풀에 광원 자체가 없다는 뜻(예: 합성 저조도 데이터)")
-    print("                     표본 수가 작으면(예: 2/40) 이 열의 신뢰도도 낮다")
-    print("  정규화대비   >1.0 이어야 '밝히기'가 아닌 '대비 강조'")
-    print("  노이즈증폭   >1.0 이면 신호보다 노이즈를 더 키운 것 (H2)")
-    print("\n  ⚠️ 정규화대비·노이즈증폭 지표에도 알려진 결함이 있다 — 판정 전 반드시")
-    print("     lowlight_classical.md 7장(지표 재설계 항목)을 확인할 것.")
+    print("\n  ── 신 지표 (절대 기준 — 이 열로 판정한다) ──")
+    print("  노이즈 절대σ  평활 암부에 국한한 절대 σ. **(입력) 행보다 크면 노이즈를 드러낸 것.**")
+    print("                정규화하지 않으므로 밝기이득에 상쇄되지 않는다. 마스크는 입력에서")
+    print("                고정해 모든 arm 이 같은 화소를 본다. '색' 열이 육안의 '컬러 노이즈'")
+    print("                축에 직접 대응한다 (H2 판정은 이 두 열로 한다)")
+    print("  대비(감마대비) 같은 평균밝기의 감마 영상 대비 국소대비 비. >1.0 이어야 '균일하게")
+    print("                밝히기'를 넘어선 진짜 대비 강조다")
+    print(f"  광원코어      휘도>={LAMP_MIN:.0f} 화소를 입력에서 고정해 전→후를 본다. 낮아지면 실제 억제.")
+    print("                '—' 는 그 풀에 광원 자체가 없다는 뜻(예: 합성 저조도 데이터).")
+    print("                표본 수가 작으면(예: 2/40) 이 열의 신뢰도도 낮다")
+    print("  포화율        광원의 '번짐'. 코어 밝기와 별개 피해다 — 코어를 유지하면서")
+    print("                면적만 키우는 arm 이 있다 (A2·L1). 둘 다 봐야 눈부심 거동이 보인다")
+    print("\n  ── 구 지표 (║ 오른쪽 — 문서 6-2·6-3 대조용. 서열화에 쓰지 말 것) ──")
+    print("  세 열 모두 측정 대상을 영상 통계에 상대적으로 정의해 무너진다. 강광원Δ 는 어두운")
+    print("  영상에서 광원을 표본에 넣지 못하고, 정규화대비는 저조도에서 1.0 아래로 눌리며,")
+    print("  노이즈증폭은 육안과 반대 결론을 낸다. 상세는 metrics.py docstring.")
 
 
 def build_sheet(arms, night, out_path: Path, rows: int = 4, cell_w: int = 300):

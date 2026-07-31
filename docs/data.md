@@ -467,11 +467,17 @@ New-Item -ItemType Junction -Path "<저장소>\data\NightOwls" -Target "D:\datas
 
 ## 7. 다음 액션
 
+> 📋 **본 문서 범위(데이터·모델 전략)의 액션만 다룬다.** 프로젝트 전체의 작업 순서·병렬성·
+> 일정 배치는 **[TODO.md](TODO.md)** 참고 — 아래 항목 다수가 그 문서의
+> **크리티컬 패스(`C1`~`C7`)** 에 해당한다.
+
 **완료**
 - [x] ExDark · LOL · LoLI-Street · StairNet 다운로드 및 무결성 검증 (`scripts/inspect_datasets.py`)
 - [x] 후보 ① 하이브리드(Canny→Hough+기하검증) 야간 재현율/오탐 baseline 측정 → **기각 결정** (→ 4장)
 - [x] StairNet 계단 데이터 야간 적용성 파일럿 검증
 - [x] LoLI-Street 동봉 YOLO 라벨 클래스 구성 확인 → COCO 80클래스, person 47,791박스 (→ 2-1)
+- [x] **② 고전 톤매핑(A) 기준선 구현** (7/29) — A1(CLAHE)/A2(AGCWD) 분할 + 하이라이트 압축 계열(D1·R1·L1) 추가, `+bf` 직교 스테이지 분리 → `scripts/lowlight.py` ([lowlight_classical.md 6장](lowlight_classical.md))
+- [x] **② 목적 축 지표 재설계** (7/31) — 글레어·대비·노이즈 3개 지표를 절대 기준으로 교체, 육안 재현 검증 → `scripts/metrics.py` ([lowlight_classical.md 6-4](lowlight_classical.md))
 
 **진행 필요 — 우선순위 순**
 - [ ] **LoLI-Street 라벨 육안 검수** (야간 샘플 수십 장) → pseudo-label 신뢰도 확인 후 ③ 보행자 학습 착수
@@ -479,9 +485,8 @@ New-Item -ItemType Junction -Path "<저장소>\data\NightOwls" -Target "D:\datas
 - [ ] StairNet 선분 라벨 → BBox 변환 스크립트 작성 (`stairs` 클래스 사전학습용)
 - [ ] YOLO 통합 학습 — `stairs` + `person` 단일 모델 baseline
 - [ ] 주간 인도보행 → 야간 저조도 합성 증강 파이프라인 구축 — **AI Hub 취득의 선행 조건** (→ 5-1)
-- [ ] 디스크 여유 확보(외장 스토리지 등) 후 **NightOwls·AI Hub 부분 다운로드** — 현재 저장공간 사유로 보류 (→ 5-1)
-- [ ] **② 고전 톤매핑(A) 기준선 구현** — CLAHE+감마+노이즈 억제. 학습 불요, 즉시 착수 가능 (→ 2-3-2)
-- [ ] **② 단독 720p FPS 실측** — A / B / C arm별. 1차 게이트 판정 ([hardware_inference.md 5장](hardware_inference.md))
+- [ ] ~~디스크 여유 확보 후~~ **NightOwls Validation 다운로드 완료 확인 → 선택 해제(~15 GiB)** — 저장공간 사유는 D드라이브 확인으로 해소(→ 5-1 정정), 7/29 다운로드 착수(→ 5-2). AI Hub 는 야간화 증강 선행 필요로 별도 보류
+- [ ] **② 단독 720p FPS 실측** — A / B / C arm별. 1차 게이트 판정 ([hardware_inference.md 5장](hardware_inference.md)). A arm 은 학습 PC CPU 실측 완료(5~6ms 통과, [lowlight_classical.md 6-1](lowlight_classical.md)) — **B·C 미실측, 목표 실행 환경 기준 재실측 필요**
 - [ ] **② 방식 비교 실험** — `무처리`/A/B/C 4-arm × 탐지 mAP·노이즈 증폭·PSNR (→ 2-3-3)
 - [ ] 🗣️ **팀 회의 ① — ② 처리 방식 확정** (FPS 예산 배분·판정 기준 사전 승인·표시/탐지 분리) — **C안 본학습 착수 전** (→ 2-3-4)
 - [ ] 🗣️ **팀 회의 ② — 자체 paired 촬영 존폐·규모 확정** (촬영 공수·초상권) — **첫 촬영 전 필수** (→ 2-4)

@@ -11,10 +11,12 @@
 
 | 찾는 것 | 문서 |
 |---------|------|
+| **무엇을 언제 해야 하는가 (전체 TODO·순서·병렬성)** | **[docs/TODO.md](docs/TODO.md)** ★ |
 | 무엇을·왜 만드는가 (기획) | **이 문서** 1~5장 |
 | 어떤 데이터를 쓰고 모델을 어떻게 정했나 | [docs/data.md](docs/data.md) |
 | 실시간 성능·양자화·폼팩터 검토 | [docs/hardware_inference.md](docs/hardware_inference.md) |
-| ② 고전 기법 지형도·속도 실측·**야간 재판정** | [docs/lowlight_classical.md](docs/lowlight_classical.md) |
+| ② 고전 기법 지형도·속도 실측·**야간 재판정**·**지표 재설계** | [docs/lowlight_classical.md](docs/lowlight_classical.md) |
+| ② 목적 축을 **무엇으로 어떻게 재는가** (지표 정의·결함 이력) | [scripts/metrics.py](scripts/metrics.py) — `uv run python scripts/metrics.py` |
 | ② arm 결과를 **눈으로 확인** (톤커브·확대비교) | [notebooks/lowlight_arms_review.ipynb](notebooks/lowlight_arms_review.ipynb) |
 | ② arm 10개의 **차이 설명** + LOL 원본/GT 비교 + **자체 촬영 야간 사진 전 arm 적용** | [notebooks/lowlight_lol_review.ipynb](notebooks/lowlight_lol_review.ipynb) |
 | 계단 검출 방식 정량 검증 (실험) | [notebooks/stair_hybrid_baseline.ipynb](notebooks/stair_hybrid_baseline.ipynb) |
@@ -39,6 +41,7 @@ uv sync                         # .venv 생성 + 의존성 설치 (uv.lock 기�
 ```powershell
 uv run python scripts/inspect_datasets.py         # data/ 배치 후 무결성 검증 (최초 1회)
 uv run python scripts/probe_classical.py          # ② 고전 기법 속도 프로브
+uv run python scripts/metrics.py                  # ② 목적 축 지표 자기검증 (신·구 대조)
 uv run python scripts/compare_lowlight.py --dataset lol   # ② arm 비교 (속도·PSNR/SSIM·노이즈)
 uv run python scripts/night_eval.py --profile-only        # ② 야간 표본 밝기·포화 프로파일만
 uv run python scripts/night_eval.py                       # ② 야간 표본 목적 축 전체 평가
@@ -58,7 +61,7 @@ JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`
 
 > 세부 사항(uv를 쓰는 이유·의존성 변경 방법·검증된 버전 구성)은 [개발 환경](#개발-환경) 참고.
 
-## 현재 진행 상황 (2026-07-29)
+## 현재 진행 상황 (2026-07-31)
 
 **7월 초·중 목표**(아키텍처 설계, 모델 선정·베이스라인, 환경 셋업, 데이터 구축) 중 **환경·데이터·계단 방식 결정**이 완료됐다.
 
@@ -69,6 +72,10 @@ JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`
   - LoLI-Street에 **YOLO 라벨(person 47,791박스)이 동봉**된 것을 확인 → ③ 보행자 학습을 NightOwls 없이도 착수 가능
 - **계단 검출 방식 확정**: 고전 CV 하이브리드를 정량 검증해 **기각**, YOLO `stairs` 클래스 통합으로 전환
   - 야간 재현율 0.232 / 오경보율 상한 100% — 안전 기준 미달 ([근거: data.md 4장](docs/data.md))
+- **② 목적 축 지표 재설계 완료 (7/31)** — 노이즈·글레어·대비 **3개 지표가 전부 육안과 어긋나던 문제**를 해결했다. 뿌리는 하나였다: **측정 대상을 영상 통계에 상대적으로 정의**해 영상이 바뀌면 재는 대상이 달라졌다. 셋 다 절대 기준으로 교체하고 `scripts/metrics.py` 로 통합 ([근거: lowlight_classical.md 6-4](docs/lowlight_classical.md))
+  - ★ **노이즈를 휘도와 색으로 분리한 것이 결정적**이었다. 신 색 σ 가 육안 결론(`D1`·`R1`·`L1` 컬러 노이즈, 입력의 4~6배)을 정확히 재현했고, 동시에 **`A2` 의 휘도 노이즈가 최대(입력의 8.4배)** 라는 새 사실이 드러났다. 하나의 그레이스케일 σ 로는 두 계열의 결함이 **상쇄돼 보였다**
+  - **`D1` 의 글레어 억제가 자체 촬영본에서 재현**됐다 (광원 코어 254→**148**). `A1`·`A2`·`L1` 은 코어를 전혀 못 건드린다(254 유지) — 단조 증가 톤커브의 구조적 한계 재확인
+  - **H2 봉쇄 부분 해제** — "고전은 노이즈를 증폭한다"는 확인됐으나, **"그래서 탐지를 해친다"는 절반은 여전히 mAP 대기**다
 
 ### 🔄 진행 중 / 다음
 - **② 처리 방식 미결 — 고전 톤매핑(A) / 초경량 커브추정(B) / dense 복원망(C)**. 계단과 동일하게 *가설 → 정량 측정 → 결정* 절차를 적용 중이며, **판정 기준을 측정 전에 등록**해 두었다. **측정 전까지 33k 본학습 착수는 보류** ([설계: data.md 2-3](docs/data.md))
@@ -76,6 +83,7 @@ JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`
 - ★ **보유 데이터에 야간·강광원이 없음을 확인 (7/29)** — LoLI-Street는 주간을 어둡게 만든 합성본에 가깝고(GT 200장 중 어두운 장면 0장, `low`가 `high`보다 노이즈 적음) **포화 광원이 0.00%**. 즉 **글레어 억제 성능을 원리적으로 측정할 수 없는 데이터**였다. 실제 야간 대량 소스는 **ExDark뿐**(86%가 어두움) ([근거: data.md 0장](docs/data.md))
   - **파급**: ② 방식 결정보다 **자체 야간 촬영이 선행**으로 순서가 뒤집혔다. 평가 수단이 없으면 방식을 고를 수 없다 ([2-4 회의 순서 개정](docs/data.md))
 - **② 는 ①글레어 억제를 되돌린다 — 설계 결함** — A1·A2 모두 톤커브가 단조 증가라 강광원을 **원리적으로 억제하지 못한다**(A2는 포화 면적을 최대 15배로 확대). `①→②` 직렬 구조 재검토 또는 highlight compression 계열(Drago·Reinhard·LIME) 도입 필요
+  - **측정 수단은 확보됐다 (7/31)** — 절대 임계 글레어 지표로 `D1` 이 광원 코어를 254→148 로 실제 누르는 것이 자체 촬영본에서 확인됐다. 다만 `D1` 은 속도·노이즈로 단독 채택 불가라, **다음은 조합 arm `D1→A1→bf` 실험**이다 ([lowlight_classical.md 6-3-6·6-4-4](docs/lowlight_classical.md))
 - **② 단독 720p FPS 실측** — A arm 완료, **B·C arm 미실측**. 전체 FPS 예산을 좌우하는 병목 판정은 C 실측까지 열려 있다 ([근거](docs/hardware_inference.md))
 - **시간축(비디오) 검증 미착수** — 플리커·시간축 노이즈 억제는 정지영상 벤치마크로 검출 불가. 자체 야간 **영상** 촬영이 필요 ([lowlight_classical.md 3장](docs/lowlight_classical.md))
 - **자체 야간 계단 촬영 · `stairs` BBox 라벨링** — 방침 변경으로 **필수 경로**가 됨
@@ -250,6 +258,7 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 ```
 ├── README.md                       기획 + 진행 현황 + 환경 (이 문서)
 ├── docs/
+│   ├── TODO.md                전체 작업 TODO — 크리티컬 패스·병렬 트랙·일정 배치
 │   ├── data.md                     데이터 확보 현황, 단계별 매핑, 계단 방식 결정 근거
 │   ├── hardware_inference.md       모바일 런타임·양자화, FPS 병목, 폼팩터 리스크
 │   ├── lowlight_classical.md       ② 고전 기법 지형도·720p 속도 실측, A arm 재정의 제안
@@ -258,7 +267,8 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 │   ├── inspect_datasets.py         데이터셋 무결성 검증·인벤토리
 │   ├── probe_classical.py          ② 고전 기법 속도 프로브 (→ lowlight_classical.md 2장)
 │   ├── lowlight.py                 ② 고전 arm 구현 (A1·A2·D1·R1·L1) + arm 레지스트리
-│   ├── compare_lowlight.py         ② arm 비교 하네스 (속도·화질·노이즈증폭·대조표)
+│   ├── metrics.py                  ② 목적 축 지표 정의 (글레어·대비·노이즈) + 자기검증
+│   ├── compare_lowlight.py         ② arm 비교 하네스 (속도·화질·노이즈·대조표)
 │   └── night_eval.py               ② 야간 표본 평가 (풀 프로파일·글레어·대비·노이즈·속도)
 ├── notebooks/
 │   ├── lowlight_arms_review.ipynb  ② arm 육안 검토 (톤커브·강광원/암부 확대·지표)

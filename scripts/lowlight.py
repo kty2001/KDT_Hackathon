@@ -31,6 +31,12 @@ from typing import Callable, Sequence
 import cv2
 import numpy as np
 
+# 지표는 `metrics.py` 로 옮겼다 — 글레어·대비·노이즈가 같은 결함을 공유해 한 곳에서
+# 함께 고쳐야 했다. 여기서는 기존 import 경로(`from lowlight import estimate_noise`)를
+# 살리기 위해 재수출만 한다. **새 판정에는 `metrics.noise_absolute` 를 쓸 것** —
+# 아래 둘은 밝기이득 정규화 결함이 있는 구 지표다.
+from metrics import estimate_noise, noise_amplification  # noqa: F401
+
 Frame = np.ndarray  # BGR uint8 (H, W, 3)
 Stage = Callable[[Frame], Frame]
 
@@ -286,27 +292,3 @@ def build(name: str) -> Arm:
 def _gamma_lut(gamma: float) -> np.ndarray:
     """gamma < 1 이면 밝아진다."""
     return np.clip(((np.arange(256) / 255.0) ** gamma) * 255.0, 0, 255).astype(np.uint8)
-
-
-def estimate_noise(bgr: Frame) -> float:
-    """Immerkaer(1996) 고속 노이즈 표준편차 추정.
-
-    라플라시안 유사 커널의 응답 절대값 평균으로 σ 를 추정한다. 영상 내용에
-    거의 영향을 받지 않아, 처리 전후 노이즈 변화를 재는 용도로 쓸 수 있다.
-    """
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
-    kernel = np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]], dtype=np.float32)
-    h, w = gray.shape
-    response = np.abs(cv2.filter2D(gray, -1, kernel))
-    return float(response.sum() * np.sqrt(np.pi / 2) / (6.0 * (w - 2) * (h - 2)))
-
-
-def noise_amplification(src: Frame, dst: Frame) -> float:
-    """밝기 이득으로 정규화한 노이즈 증폭률 — 가설 H2 의 측정량.
-
-    단순히 σ 비를 보면 "밝히면 노이즈도 커진다"는 당연한 사실만 나온다.
-    평균 밝기 이득으로 나눠, **신호보다 노이즈를 더 키웠는지**를 본다.
-    1.0 을 넘으면 SNR 이 나빠졌다는 뜻이다.
-    """
-    gain = (float(dst.mean()) + 1e-6) / (float(src.mean()) + 1e-6)
-    return (estimate_noise(dst) + 1e-6) / (estimate_noise(src) + 1e-6) / gain
