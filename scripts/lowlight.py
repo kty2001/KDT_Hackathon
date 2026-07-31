@@ -272,6 +272,19 @@ _BUILDERS: dict[str, Callable[[], Arm]] = {
     "R1+bf": lambda: Arm("R1+bf", [Tonemap("reinhard"), Bilateral()]),
     "L1": lambda: Arm("L1", [LIME()]),
     "L1+bf": lambda: Arm("L1+bf", [LIME(), Bilateral()]),
+    # 조합 arm — 단일 arm 이 목적 축을 동시 충족하지 못해(→ lowlight_classical.md
+    # 6-3-6) 역할을 분담한다: D1(하이라이트 압축) → A1(국소 대비 복원) → bf(노이즈).
+    # D1 이 전체를 어둡게 눌러 대비를 잃는 결함(6-3-4의 3)을 A1 의 타일 적응이
+    # 보상하는 것이 노림수다.
+    #
+    # CLAHE 의 감마는 1.0 으로 뺀다(단독 A1 은 0.75). D1 이 이미 표시 감마(2.2)를
+    # 씌워 내보내므로 추가 감마는 중복이고, 실측에서도 대비 이득이 거의 없이
+    # (1.73→1.67) D1 이 눌러둔 하이라이트만 되올렸다(코어 −58 → γ1.0 에서 −73).
+    #
+    # 비용은 스테이지 합산이라 720p 게이트는 원리적으로 못 넘는다. 내부 처리
+    # 해상도 하향(640×360) 또는 셰이더 이식이 전제다 (→ 6-5).
+    "D1A1": lambda: Arm("D1A1", [Tonemap("drago"), CLAHE(gamma=1.0)]),
+    "D1A1+bf": lambda: Arm("D1A1+bf", [Tonemap("drago"), CLAHE(gamma=1.0), Bilateral()]),
 }
 
 ARM_NAMES = tuple(_BUILDERS)
