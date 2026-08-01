@@ -45,6 +45,8 @@ uv run python scripts/metrics.py                  # ② 목적 축 지표 자기
 uv run python scripts/compare_lowlight.py --dataset lol   # ② arm 비교 (속도·PSNR/SSIM·노이즈)
 uv run python scripts/night_eval.py --profile-only        # ② 야간 표본 밝기·포화 프로파일만
 uv run python scripts/night_eval.py                       # ② 야간 표본 목적 축 전체 평가
+uv run python scripts/resolution_sweep.py                 # ② C6 — 해상도 × arm 속도·목적 축 스윕
+uv run python scripts/extract_nightowls.py                # NightOwls 선택 해제 계획 (--run 으로 실행)
 uv run python scripts/emphasize.py                        # ④ 강조 렌더 데모 (②→③→④ 연결)
 ```
 
@@ -88,12 +90,18 @@ JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`
   - **파급**: ② 방식 결정보다 **자체 야간 촬영이 선행**으로 순서가 뒤집혔다. 평가 수단이 없으면 방식을 고를 수 없다 ([2-4 회의 순서 개정](docs/data.md))
 - **② 는 ①글레어 억제를 되돌린다 — 설계 결함** — A1·A2 모두 톤커브가 단조 증가라 강광원을 **원리적으로 억제하지 못한다**(A2는 포화 면적을 최대 15배로 확대). `①→②` 직렬 구조 재검토 또는 highlight compression 계열(Drago·Reinhard·LIME) 도입 필요
   - ★ **조합 arm `D1A1+bf` 실측 완료 (7/31) — 3축(글레어·대비·색노이즈) 동시 만족 첫 arm.** 표시 경로 **잠정 1위를 `A1+bf` 에서 교체**했다(`A1+bf` 는 신 지표에서 글레어 −3·대비 0.82 로 양 축 실격). 조합에서는 A1 감마를 1.0 으로 빼야 한다는 설계 수정 포함. **잔여**: 휘도 노이즈 기준선 3배(A3 시간축이 유망 대응) · 640×360 내부 처리 전제 · 야간 표본(ExDark·StairNet) 재검증 · 채택 시 ①이 ②에 흡수되므로 회의 안건 격상 ([lowlight_classical.md 6-5](docs/lowlight_classical.md))
-- **② 단독 720p FPS 실측** — A arm 완료, **B·C arm 미실측**. 전체 FPS 예산을 좌우하는 병목 판정은 C 실측까지 열려 있다 ([근거](docs/hardware_inference.md))
+  - ★ **글레어 코어 지표가 처리 해상도에 크게 의존한다 (8/1 발견)** — 같은 자체 촬영본을 줄여가며 재면 `D1` 의 광원 코어가 **원본 10 · 짧은변720 151 · 640 158 · 480 161** 로 갈린다. Drago 의 전역 로그 매핑이 입력 전체 통계로 정해지기 때문이다. **함의: 내부 처리 해상도 결정이 속도만이 아니라 글레어 억제 성능 자체를 바꾼다** — `C6` 실측 시 해상도별로 목적 축을 함께 재야 한다 ([lowlight_classical.md 7장](docs/lowlight_classical.md))
+- **② 단독 FPS 실측(C6) — ✅ 완료 (8/1), 해상도 × 목적 축으로 확장**. 속도와 목적 축을 **같은 프레임에서** 함께 쟀다(`scripts/resolution_sweep.py`, 야간 37장: NightOwls 12 + ExDark 12 + StairNet 12 + 자체 1). **속도 게이트와 3축을 확실히 동시에 만족하는 조합은 없다** — `R1+bf`·`D1A1+bf` 가 640×360 에서 3축을 채우나 속도가 판정 불가 밴드(~19.5·~20.2ms)다. **잠정 1위 `D1A1+bf` 는 37장 표본에서도 유지** ([근거: lowlight_classical.md 6-6](docs/lowlight_classical.md))
+  - 720p 확실 통과는 **`A1`·`A2` 뿐**(6ms) — 대신 이 둘은 글레어 축 실격이다. 하이라이트 압축 계열은 720p 70~91ms 로 명백히 탈락
+  - ⚠️ **개발 PC 는 15~25ms 를 판정할 수 없다** — 프로세스 간 10~20% 흔들린다(`A1+bf` @720p 를 네 번 재서 18.3/18.8/19.5/22.4ms). 이 밴드는 `경계` 로 보류하고 절대 판정은 C11 실기기 몫
+  - **다음 수: `bf` → A3 시간축 억제 교체.** `D1A1`(bf 제외)는 ~17.9ms 로 더 빠르고, 미달 축(색 σ)이 정확히 시간축 억제가 다루는 것이다
+  - **B·C arm 은 여전히 미실측** — C안(dense) 착수 여부 판정은 열려 있다
 - **시간축(비디오) 검증 미착수** — 플리커·시간축 노이즈 억제는 정지영상 벤치마크로 검출 불가. 자체 야간 **영상** 촬영이 필요 ([lowlight_classical.md 3장](docs/lowlight_classical.md))
 - **자체 야간 계단 촬영 · `stairs` BBox 라벨링** — 방침 변경으로 **필수 경로**가 됨
 - ③ YOLO 통합 학습 (`person` + `stairs` 단일 모델) baseline
-- **NightOwls Validation — 🔄 다운로드 중 (7/29 착수)**. 기존 "저장공간 부족" 보류 사유는 **C드라이브만 본 오판**이었다 — D드라이브에 349.8 GiB 여유가 있어 해소. 라벨 확보 완료 실측: **51,848장 전량 야간**, `pedestrian` 10,179박스, 라벨 있는 이미지 18.3%
+- **NightOwls Validation — ✅ 확보 완료 (8/1)**. 기존 "저장공간 부족" 보류 사유는 **C드라이브만 본 오판**이었다 — D드라이브 여유로 해소. 53.53 GiB 전량 취득 후 **13,602장(13.78 GiB) 선택 해제**(라벨 있는 9,489장 + recording 38 연속 4,605장). 라벨 실측: **51,848장 전량 야간**, `pedestrian` 10,179박스, 라벨 있는 이미지 18.3%
   - **연속 영상(5 recording, ≈16fps, tracking_id 보유)** 이라 **A3 시간축(플리커·시간축 노이즈) 검증을 자체 촬영 없이 착수 가능** ([취득·위치·라벨: data.md 5-2](docs/data.md))
+  - → 이로써 **`W1`(A3 시간축 arm) · `W4`(야간 표본 arm 비교 재실행)** 의 선행조건이 풀렸다 ([TODO.md 4장](docs/TODO.md))
 - **AI Hub 인도보행 — ⏸ 보류**. 저장공간 사유는 해소됐으나, 대부분 주간이라 **야간화 증강 파이프라인이 선행돼야 한다**는 별개 사유가 유효 ([data.md 5-1](docs/data.md))
 
 ---
@@ -269,12 +277,14 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 │   └── 아이디어기획서_밤마실_20260729.pdf    원본 기획서 (수정 금지)
 ├── scripts/
 │   ├── inspect_datasets.py         데이터셋 무결성 검증·인벤토리
+│   ├── extract_nightowls.py        NightOwls Validation 선택 해제 (전량 대신 ~14 GiB)
 │   ├── probe_classical.py          ② 고전 기법 속도 프로브 (→ lowlight_classical.md 2장)
 │   ├── lowlight.py                 ② 고전 arm 구현 (A1·A2·D1·R1·L1 + 조합 D1A1) + 레지스트리
 │   ├── metrics.py                  ② 목적 축 지표 정의 (글레어·대비·노이즈) + 자기검증
 │   ├── emphasize.py                ④ 선택적 강조 — BBox 경계선 대비색 렌더 + ③ 인터페이스
 │   ├── compare_lowlight.py         ② arm 비교 하네스 (속도·화질·노이즈·대조표)
-│   └── night_eval.py               ② 야간 표본 평가 (풀 프로파일·글레어·대비·노이즈·속도)
+│   ├── night_eval.py               ② 야간 표본 평가 (풀 프로파일·글레어·대비·노이즈·속도)
+│   └── resolution_sweep.py         ② C6 — 해상도 × arm 속도 게이트 + 목적 축 동시 측정
 ├── notebooks/
 │   ├── lowlight_arms_review.ipynb  ② arm 육안 검토 (톤커브·강광원/암부 확대·지표)
 │   ├── lowlight_lol_review.ipynb   ② arm 차이 설명 + LOL 원본/GT 비교 + 자체 촬영본(10절)

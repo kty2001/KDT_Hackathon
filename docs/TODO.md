@@ -125,7 +125,7 @@ flowchart TD
 | **C3** | **자체 야간 `stairs` BBox 라벨링** | C2 (+🗣️회의 4번으로 라벨 정의 선확정) | 💻 | 팀원3 | [data.md 4-3](data.md) |
 | **C4** | **③ YOLO 통합 baseline 학습** (`person`+`stairs` 단일 모델) | C1 (+C3는 파인튜닝 단계) | 🖥️ | 팀원1 | [data.md 6장](data.md) |
 | **C5** | **야간 평가셋 확정** — 자체 촬영분을 주 평가셋으로 승격 | C2, C3 | 💻 | 팀원3·팀장 | [data.md 2-3-3 ⚠️⚠️](data.md) |
-| **C6** | **② 단독 FPS 실측 → 1차 게이트 판정** (≤20ms/frame @720p) | 없음 — **즉시 착수 가능**. C1·C2와 동시 진행 | 🖥️ | 팀장 | [hardware_inference.md 5장](hardware_inference.md) |
+| **C6** | ✅ ~~**② 단독 FPS 실측 → 1차 게이트 판정**~~ — **완료 (8/1)**, 해상도 × 목적 축까지 확장 (`scripts/resolution_sweep.py`). 잔여는 밴드 정밀화 or `C11` 이관 | 완료 | 🖥️ | 팀장 | [lowlight_classical.md 6-6](lowlight_classical.md) |
 | **C7** | **② 4-arm mAP 판정** — `무처리`/A/B/C | **C4 + C5 + C6** ← 셋 다 필요 | 🖥️ | 팀장 | [data.md 2-3-3](data.md) |
 | **C8** | 🗣️ **회의 — ② 처리 방식 확정** (FPS 예산·판정 기준·표시/탐지 분리) | C7 | — | 전원 | [data.md 2-3-4](data.md) |
 | **C9** | **①②③④ 파이프라인 통합** | C8 + P1·P2·P3 | 💻🖥️ | 팀장 | README 2장 |
@@ -204,7 +204,7 @@ flowchart TD
 | **B arm 구현·실측** (Zero-DCE / SCI 계열 초경량 커브추정) — **미착수** | 없음 | 🖥️ | [data.md 2-3-2](data.md) |
 | 🗣️ 채도 보정 적용 여부 결정 (적용 시 arm 수 2배) | 없음 | — | [6-1의 4](lowlight_classical.md) |
 | `+bf` 기본값 승격 검토 — 신 지표에서 **반례 2건** 확인됨 | 없음 | 💻 | [6-4-3의 5·6](lowlight_classical.md) |
-| 노트북 `lowlight_lol_review.ipynb` 7절·10-4 **신 지표로 재실행** | 없음 | 💻 | [7장](lowlight_classical.md) |
+| ✅ ~~노트북 `lowlight_lol_review.ipynb` 7절·10-4 **신 지표로 재실행**~~ — 완료 (8/1). **글레어 코어가 처리 해상도에 크게 의존**한다는 새 관측 포함 | 없음 | 💻 | [7장](lowlight_classical.md) |
 | 🗣️ opencv-contrib 교체 여부 (BIMEF를 arm에 올릴 때만) | 없음 | — | [5장](lowlight_classical.md) |
 | LoLI-Street 라벨 육안 검수 (pseudo-label 신뢰도) | 없음 | 🖥️ | [data.md 2-1](data.md) |
 
@@ -226,19 +226,26 @@ flowchart TD
 
 | # | 작업 | **무엇을 기다리는가** | 근거 |
 |---|------|----------------------|------|
-| **W1** | **A3 시간축 arm** (IIR 톤커브 평활 + 모션적응 시간축 노이즈 억제) | NightOwls Validation **압축 해제**(연속 5 recording, ≈16fps) **또는** 자체 야간 *영상* 촬영 | [3장](lowlight_classical.md) |
+| **W1** | **A3 시간축 arm** (IIR 톤커브 평활 + 모션적응 시간축 노이즈 억제) | ✅ **해제됨 (8/1)** — recording 38 의 연속 4,605프레임(≈16fps) 확보. **착수 가능** | [3장](lowlight_classical.md) |
 | **W2** | 주간 → 야간 저조도 **합성 증강 파이프라인** | 없음(착수 가능)이나, **AI Hub 취득의 선행조건**이라 AI Hub를 쓸 때만 의미 | [data.md 5-1](data.md) |
 | **W3** | **C안 dense 복원망 33k 본학습** | **C6 게이트 통과 시에만.** 측정 없이 착수 금지 — 되돌리기 어렵다 | [data.md 2-3-4](data.md) |
-| **W4** | NightOwls 도착 후 **6-3 arm 비교 재실행** | NightOwls 해제. ExDark는 야간이되 **실내가 많아** 보행 도메인과 다름 | [6-3-5](lowlight_classical.md) |
+| **W4** | NightOwls 도착 후 **6-3 arm 비교 재실행** | ✅ **해제됨 (8/1)** — 야간 주행 시점 13,602장 확보. ExDark는 야간이되 **실내가 많아** 보행 도메인과 다르므로 재실행 필요. **착수 가능** | [6-3-5](lowlight_classical.md) |
 | **W5** | AI Hub 인도보행 부분 다운로드 | W2 완료 (대부분 주간이라 야간화 없이는 못 씀) | [data.md 5-1](data.md) |
 | **W6** | 탐지 프레임 스킵 + 트래킹 보간 | C4 (③ 모델) | [hardware_inference.md 5장](hardware_inference.md) |
-| **W7** | 내부 처리 해상도 확정 → **보류군(LIME·Drago 등) 재평가** | C6 (해상도별 실측치) | [7장](lowlight_classical.md) |
+| **W7** | ~~내부 처리 해상도 확정 → **보류군 재평가**~~ | ✅ **해제됨 (8/1)** — C6 가 해상도별로 재서 수행. `L1` 계열 **기각 유지**, `R1+bf` 는 억제율 −5.2% 라 대안 후보로만 보류 | [6-6-4](lowlight_classical.md) |
 
-### NightOwls — 진행 확인 필요
+### ✅ NightOwls — 취득·해제 완료 (2026-08-01)
 
-7/29 착수한 다운로드(53.5 GiB)가 **완료됐는지 확인이 안 됐다.** 완료됐다면 W1·W4가
-즉시 풀린다. 해제는 **전량 하지 말 것** — 라벨 있는 9,489장(~10.3 GiB) + recording 1개
-통째(~5.0 GiB) = **약 15 GiB**로 두 용도를 모두 커버한다 ([data.md 5-2](data.md)).
+7/29 착수한 다운로드는 **37.06 GiB 에서 멈춰 있었다**(2.5일간 진행 없음). 이어받기를
+재개해 **53.53 GiB 전량 확보**했고, 무결성은 zip 중앙 디렉토리에서 PNG **51,848개**가
+라벨 JSON 의 이미지 수와 일치하는 것으로 확인했다.
+
+선택 해제 결과 — `data/NightOwls/images/` 에 **13,602장 / 13.78 GiB**
+(라벨 있는 9,489장 + recording 38 통째 4,605장, 492장 중복). `uv run python
+scripts/extract_nightowls.py` (dry-run 기본, `--run` 으로 실행).
+
+**→ `W1`(A3 시간축 arm) · `W4`(야간 표본 arm 비교 재실행) 선행조건이 풀렸다.**
+zip 은 D드라이브에 유지(재다운로드 53.5 GiB). D 여유 257.4 GiB.
 
 ---
 
@@ -297,14 +304,14 @@ flowchart TD
 | 🗣️ **회의 3·4번** (촬영 프로토콜·개인정보·`stairs` 라벨 정의) — 촬영의 전제 | 전원 | — |
 | **C1** StairNet 선분 → BBox 변환 스크립트 | 팀원1 | 🖥️ |
 | **C2** 야간 촬영지 섭외·장비 준비 (회의 직후 출발) | 팀원3 | 🎥 |
-| **C6** ② 단독 FPS 실측 → 1차 게이트 판정 (**C안 착수 여부가 여기서 갈린다**) | 팀장 | 🖥️ |
+| ~~**C6** ② 단독 FPS 실측~~ → ✅ 완료 (8/1, → [6-6](lowlight_classical.md)). **잔여: `A3` 시간축 arm 구현** — `bf` 대체가 게이트 돌파의 유일한 실마리 | 팀장 | 🖥️ |
 | ~~**P1** ④ 선택적 강조 구현~~ → ✅ 완료 (7/31, `scripts/emphasize.py`). 잔여는 실기기 가독성 검증 | 팀장 | 💻 |
 | ~~**P2** 조합 arm `D1→A1→bf` 실험~~ → ✅ 완료 (7/31, [6-5](lowlight_classical.md)). 잔여는 학습 PC 몫 | 팀장 | 💻 |
 | **P3** 앱 껍데기 — 카메라→표시 루프 (처리부 항등함수) | 팀원2 | 📱 |
 | **P4** B arm(Zero-DCE/SCI) 구현 · LoLI-Street 라벨 육안 검수 | 팀원1 | 🖥️ |
 | **P5** 골판지 하우징 제작 | 팀원3 | 🎥 |
 | 노트북 7절·10-4 **신 지표로 재실행** (지표 재설계 후속) | 팀장 | 💻 |
-| NightOwls 다운로드 완료 여부 확인 → 선택 해제(~15 GiB) | 팀장 | 🖥️ |
+| ~~NightOwls 다운로드 완료 여부 확인 → 선택 해제~~ → ✅ 완료 (8/1, 13,602장/13.78 GiB). 잔여는 **W1·W4 착수** | 팀장 | 🖥️ |
 
 ---
 
