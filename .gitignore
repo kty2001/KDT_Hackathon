@@ -4,3 +4,7 @@ data/
 outputs/
 __pycache__/
 .ipynb_checkpoints/
+
+# ultralytics 가 사전학습 가중치를 작업 디렉토리에 받는다 (yolo11n.pt 등).
+# 학습 산출물은 outputs/detect/ 아래에 있으므로 루트의 것은 캐시일 뿐이다.
+*.pt

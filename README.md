@@ -14,6 +14,8 @@
 | **무엇을 언제 해야 하는가 (전체 TODO·순서·병렬성)** | **[docs/TODO.md](docs/TODO.md)** ★ |
 | 무엇을·왜 만드는가 (기획) | **이 문서** 1~5장 |
 | 어떤 데이터를 쓰고 모델을 어떻게 정했나 | [docs/data.md](docs/data.md) |
+| ③ 탐지 — 데이터 구성·baseline·**야간 검증** | [docs/detection.md](docs/detection.md) ★ |
+| ③ 예측 결과를 **눈으로 확인** | [notebooks/detect_c4_review.ipynb](notebooks/detect_c4_review.ipynb) |
 | 실시간 성능·양자화·폼팩터 검토 | [docs/hardware_inference.md](docs/hardware_inference.md) |
 | ② 고전 기법 지형도·속도 실측·**야간 재판정**·**지표 재설계** | [docs/lowlight_classical.md](docs/lowlight_classical.md) |
 | ② 목적 축을 **무엇으로 어떻게 재는가** (지표 정의·결함 이력) | [scripts/metrics.py](scripts/metrics.py) — `uv run python scripts/metrics.py` |
@@ -47,6 +49,9 @@ uv run python scripts/night_eval.py --profile-only        # ② 야간 표본 �
 uv run python scripts/night_eval.py                       # ② 야간 표본 목적 축 전체 평가
 uv run python scripts/resolution_sweep.py                 # ② C6 — 해상도 × arm 속도·목적 축 스윕
 uv run python scripts/extract_nightowls.py                # NightOwls 선택 해제 계획 (--run 으로 실행)
+uv run python scripts/stairnet_to_bbox.py                 # C1 계단 선분 → BBox 변환
+uv run python scripts/build_detect_dataset.py             # C4 준비 — 통합 탐지 데이터셋
+uv run python scripts/train_detect.py                     # C4 — ③ 탐지 baseline 학습
 uv run python scripts/emphasize.py                        # ④ 강조 렌더 데모 (②→③→④ 연결)
 ```
 
@@ -84,7 +89,11 @@ JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`
   - ②→③→④ 연결 데모에서 **원본 0건 → `D1A1+bf` 후 1건 검출**(LOL, COCO 사전학습, n=1) — ②가 ③을 돕는 방향의 첫 실물 신호. 판정은 여전히 4-arm mAP
 
 ### 🔄 진행 중 / 다음
-- **② 처리 방식 미결 — 고전 톤매핑(A) / 초경량 커브추정(B) / dense 복원망(C)**. 계단과 동일하게 *가설 → 정량 측정 → 결정* 절차를 적용 중이며, **판정 기준을 측정 전에 등록**해 두었다. **측정 전까지 33k 본학습 착수는 보류** ([설계: data.md 2-3](docs/data.md))
+- **② 처리 방식 — ✅ 고전(A/D1 계열)으로 결정 (8/1, 팀 회의 추인 대기)**. 계단과 동일하게 *가설 → 정량 측정 → 결정* 절차를 적용했고, **판정 기준을 측정 전에 등록**해 둔 채로 C6 까지 마쳤다 ([설계: data.md 2-3](docs/data.md))
+  - **결정 근거는 성능이 아니라 데이터다** — 보유한 유일한 대규모 paired 데이터(LoLI-Street 33k)의 **포화 광원이 0.00%** 라, 딥러닝 ②를 학습하면 가로등·전조등이 없는 세계에 최적화된다. **글레어 축을 학습으로 얻을 방법이 지금 없다.** 반면 고전은 학습 데이터가 필요 없고 `D1` 의 하이라이트 압축이 수식에서 나온다
+  - 부수 근거: 고전이 3축을 실제로 충족(`D1A1+bf`) · 720p 6ms(A 계열) · **일정상 C안은 8월 2주가 한계**인데 자체 paired 촬영이 선행돼야 한다
+  - **남은 것은 방식 선택이 아니라 고전 안에서의 잔여 검증** — 시간축 플리커(A3) · 속도 밴드 정밀화 · 표시/탐지 경로 분리
+  - ⚠️ **판정을 뒤집을 수 있는 유일한 축은 시간축(플리커)이다.** `A1`·`A2`·`D1` 모두 프레임마다 톤커브를 다시 계산하므로 가로등 통과 시 화면이 출렁일 수 있고, **지금까지의 모든 수치는 정지영상이라 원리적으로 검출되지 않는다** ([3-1](docs/lowlight_classical.md)). NightOwls rec38 연속 4,605프레임으로 이번 주 검증 가능
   - **A arm 구현·실측 완료 (7/29)** — 고전 기법 5개 계열을 탐색해 A를 **A1(CLAHE) / A2(AGCWD)** 로 분할하고, 노이즈 억제를 직교 스테이지(`+bf`)로 분리했다. **720p 5~6ms로 1차 게이트 여유 통과** → **② 단독은 A안에서 병목이 아니다.** 야간 표본 재판정 결과 **잠정 우선순위는 `A1+bf`** ([근거: lowlight_classical.md 6-2](docs/lowlight_classical.md))
 - ★ **보유 데이터에 야간·강광원이 없음을 확인 (7/29)** — LoLI-Street는 주간을 어둡게 만든 합성본에 가깝고(GT 200장 중 어두운 장면 0장, `low`가 `high`보다 노이즈 적음) **포화 광원이 0.00%**. 즉 **글레어 억제 성능을 원리적으로 측정할 수 없는 데이터**였다. 실제 야간 대량 소스는 **ExDark뿐**(86%가 어두움) ([근거: data.md 0장](docs/data.md))
   - **파급**: ② 방식 결정보다 **자체 야간 촬영이 선행**으로 순서가 뒤집혔다. 평가 수단이 없으면 방식을 고를 수 없다 ([2-4 회의 순서 개정](docs/data.md))
@@ -98,7 +107,12 @@ JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`
   - **B·C arm 은 여전히 미실측** — C안(dense) 착수 여부 판정은 열려 있다
 - **시간축(비디오) 검증 미착수** — 플리커·시간축 노이즈 억제는 정지영상 벤치마크로 검출 불가. 자체 야간 **영상** 촬영이 필요 ([lowlight_classical.md 3장](docs/lowlight_classical.md))
 - **자체 야간 계단 촬영 · `stairs` BBox 라벨링** — 방침 변경으로 **필수 경로**가 됨
-- ③ YOLO 통합 학습 (`person` + `stairs` 단일 모델) baseline
+- **③ YOLO 통합 baseline — ✅ 완료 (8/2), 그러나 야간 검증에서 재학습 필요 판정** (YOLO11n, 100ep). 개발 val 은 person 0.794 / stairs 0.990 인데 **사람 손 라벨인 NightOwls 에서 person mAP50 0.205 · recall 0.226 으로 붕괴** — 야간 보행자의 77% 를 놓친다 ([근거: detection.md](docs/detection.md))
+  - **원거리 작은 표본 탓이 아니다** — GT 박스 높이 중앙 84px, 86.7% 가 50px 이상. 크고 뚜렷한 보행자를 놓친다
+  - `stairs` 는 야간 거리에서 **약 10% 오탐**하고, 착각 대상이 **횡단보도·차선·포장 텍스처** 즉 *반복되는 수평 평행 엣지*다 — **고전 CV 가 오경보율 100% 로 기각된 그 실패 양식을 반복**한다
+  - ★ **뿌리가 ②와 같다** — LoLI-Street 가 주간을 어둡게 만든 합성본이라 실제 야간으로 전이되지 않는다. 0장의 데이터 성격 발견이 **②뿐 아니라 ③까지 관통하는 제약**임이 확인됐다
+  - ★ **② 를 앞단에 붙이면 탐지 재현율이 절반**(0.079→0.039, n=76). 🗣️ **표시/탐지 경로 분리**가 기본 구도가 될 수 있다
+  - → **`C4b` 재학습**: NightOwls 를 평가 전용에서 학습으로 이동 (recording 단위 분할). person 도메인 갭과 stairs 음성 표본을 한 번에 해결 ([TODO.md](docs/TODO.md))
 - **NightOwls Validation — ✅ 확보 완료 (8/1)**. 기존 "저장공간 부족" 보류 사유는 **C드라이브만 본 오판**이었다 — D드라이브 여유로 해소. 53.53 GiB 전량 취득 후 **13,602장(13.78 GiB) 선택 해제**(라벨 있는 9,489장 + recording 38 연속 4,605장). 라벨 실측: **51,848장 전량 야간**, `pedestrian` 10,179박스, 라벨 있는 이미지 18.3%
   - **연속 영상(5 recording, ≈16fps, tracking_id 보유)** 이라 **A3 시간축(플리커·시간축 노이즈) 검증을 자체 촬영 없이 착수 가능** ([취득·위치·라벨: data.md 5-2](docs/data.md))
   - → 이로써 **`W1`(A3 시간축 arm) · `W4`(야간 표본 arm 비교 재실행)** 의 선행조건이 풀렸다 ([TODO.md 4장](docs/TODO.md))
@@ -272,12 +286,16 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 ├── docs/
 │   ├── TODO.md                전체 작업 TODO — 크리티컬 패스·병렬 트랙·일정 배치
 │   ├── data.md                     데이터 확보 현황, 단계별 매핑, 계단 방식 결정 근거
+│   ├── detection.md                ③ 탐지 — 데이터 구성·C4 baseline·야간 검증·판정
 │   ├── hardware_inference.md       모바일 런타임·양자화, FPS 병목, 폼팩터 리스크
 │   ├── lowlight_classical.md       ② 고전 기법 지형도·720p 속도 실측, A arm 재정의 제안
 │   └── 아이디어기획서_밤마실_20260729.pdf    원본 기획서 (수정 금지)
 ├── scripts/
 │   ├── inspect_datasets.py         데이터셋 무결성 검증·인벤토리
 │   ├── extract_nightowls.py        NightOwls Validation 선택 해제 (전량 대신 ~14 GiB)
+│   ├── stairnet_to_bbox.py         C1 — StairNet 선분 라벨 → YOLO BBox 변환
+│   ├── build_detect_dataset.py     C4 준비 — person(LoLI) + stairs(StairNet) 통합 데이터셋
+│   ├── train_detect.py             C4 — ③ 통합 탐지 baseline 학습
 │   ├── probe_classical.py          ② 고전 기법 속도 프로브 (→ lowlight_classical.md 2장)
 │   ├── lowlight.py                 ② 고전 arm 구현 (A1·A2·D1·R1·L1 + 조합 D1A1) + 레지스트리
 │   ├── metrics.py                  ② 목적 축 지표 정의 (글레어·대비·노이즈) + 자기검증
@@ -286,6 +304,7 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 │   ├── night_eval.py               ② 야간 표본 평가 (풀 프로파일·글레어·대비·노이즈·속도)
 │   └── resolution_sweep.py         ② C6 — 해상도 × arm 속도 게이트 + 목적 축 동시 측정
 ├── notebooks/
+│   ├── detect_c4_review.ipynb      ③ C4 예측 결과 육안 검토 (지름길 검증·야간 실패 분석)
 │   ├── lowlight_arms_review.ipynb  ② arm 육안 검토 (톤커브·강광원/암부 확대·지표)
 │   ├── lowlight_lol_review.ipynb   ② arm 차이 설명 + LOL 원본/GT 비교 + 자체 촬영본(10절)
 │   └── stair_hybrid_baseline.ipynb 계단 고전 CV 검출 정량 평가 (→ 기각 근거)

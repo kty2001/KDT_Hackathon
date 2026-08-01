@@ -120,10 +120,11 @@ flowchart TD
 
 | # | 작업 | 선행조건 | 환경 | 담당 | 근거 |
 |---|------|----------|------|------|------|
-| **C1** | **StairNet 선분 라벨 → BBox 변환 스크립트** | 없음 — **즉시 착수 가능** | 🖥️ | 팀원1 | [data.md 4-3](data.md) |
+| **C1** | ✅ ~~**StairNet 선분 라벨 → BBox 변환 스크립트**~~ — **완료 (8/1)** `scripts/stairnet_to_bbox.py`. train 2,670 / val 424장, **계단 전체 1박스**(잠정 정의 — 회의 안건 4) | 완료 | 🖥️ | 팀원1 | [data.md 4-3](data.md) |
 | **C2** | **자체 야간 촬영 (탐지 세션 — 핸드헬드·동적)** | 없음 — **존폐 결정 불요, 즉시 착수** | 🎥 | 팀원3 | [data.md 2-4 개정](data.md) |
 | **C3** | **자체 야간 `stairs` BBox 라벨링** | C2 (+🗣️회의 4번으로 라벨 정의 선확정) | 💻 | 팀원3 | [data.md 4-3](data.md) |
-| **C4** | **③ YOLO 통합 baseline 학습** (`person`+`stairs` 단일 모델) | C1 (+C3는 파인튜닝 단계) | 🖥️ | 팀원1 | [data.md 6장](data.md) |
+| **C4** | ✅ ~~**③ YOLO 통합 baseline 학습**~~ — **완료 (8/2)** YOLO11n 100ep. 개발 val person 0.794 / stairs 0.990. **그러나 NightOwls 실제 야간 라벨에서 person mAP50 0.205 · recall 0.226 으로 붕괴** — 학습 데이터 교체가 선행돼야 한다 (→ [data.md 2-1-2](data.md)) | 완료 | 🖥️ | 팀원1 | [data.md 6장](data.md) |
+| **C4b** | 🔴 **재학습 — NightOwls 를 학습에 투입** (recording 단위 분할) + **stairs 음성 표본 주입**(야간 거리 10% 오탐, → [data.md 2-1-2](data.md)) | C4 | 🖥️ | 팀원1 | 신규 (8/2) |
 | **C5** | **야간 평가셋 확정** — 자체 촬영분을 주 평가셋으로 승격 | C2, C3 | 💻 | 팀원3·팀장 | [data.md 2-3-3 ⚠️⚠️](data.md) |
 | **C6** | ✅ ~~**② 단독 FPS 실측 → 1차 게이트 판정**~~ — **완료 (8/1)**, 해상도 × 목적 축까지 확장 (`scripts/resolution_sweep.py`). 잔여는 밴드 정밀화 or `C11` 이관 | 완료 | 🖥️ | 팀장 | [lowlight_classical.md 6-6](lowlight_classical.md) |
 | **C7** | **② 4-arm mAP 판정** — `무처리`/A/B/C | **C4 + C5 + C6** ← 셋 다 필요 | 🖥️ | 팀장 | [data.md 2-3-3](data.md) |
@@ -255,7 +256,7 @@ zip 은 D드라이브에 유지(재다운로드 53.5 GiB). D 여유 257.4 GiB.
 
 | # | 안건 | 결정 시점 | 근거 |
 |---|------|-----------|------|
-| 1 | **② 처리 방식 확정** (A/B/C) + **FPS 예산 배분 + 게이트 측정 환경 기준** + 판정 기준 사전 승인 + 표시/탐지 경로 분리 | **C7 직후** | [data.md 2-3-4](data.md) |
+| 1 | ~~② 처리 방식 확정 (A/B/C)~~ → **고전으로 결정 (8/1) — 회의는 추인만.** 남은 안건: **FPS 예산 배분 + 게이트 측정 환경 기준 + 표시/탐지 경로 분리** | **C7 직후** | [lowlight_classical.md 6-6](lowlight_classical.md) |
 | 2 | **①을 ②에 통합할 것인가** — `D1A1+bf` 채택 시 통합이 **기본 구도** (조합 arm 실측 완료로 격상) | 야간 표본 재검증 후 | [6-5-4](lowlight_classical.md) |
 | 3 | 자체 **paired** 촬영 존폐·규모 (탐지 세션과 별개) + 초상권·개인정보 방침 | **첫 촬영 전** | [data.md 2-4](data.md) |
 | 4 | `stairs` BBox 라벨 정의 (계단 전체/단위, 부분 가림, 최소 크기) | **C3 라벨링 착수 전** — 사후 변경 시 전량 재라벨링 | [data.md 2-4 안건 6](data.md) |
@@ -336,6 +337,8 @@ zip 은 D드라이브에 유지(재다운로드 53.5 GiB). D 여유 257.4 GiB.
 | 기획·현재 진행 상황 | [README.md](../README.md) |
 | 데이터 현황·모델 전략·계단 결정 근거 | [docs/data.md](data.md) |
 | ② 고전 기법 지형도·arm 실측·**지표 재설계** | [docs/lowlight_classical.md](lowlight_classical.md) |
+| ③ 탐지 — 데이터 구성·baseline·야간 검증·판정 | [docs/detection.md](detection.md) |
+| ③ 예측 결과 육안 검토 | [notebooks/detect_c4_review.ipynb](../notebooks/detect_c4_review.ipynb) |
 | ② arm 육안 비교(LOL 기준) 안내 | [docs/lowlight_classical_result.md](lowlight_classical_result.md) |
 | 모바일 런타임·양자화·FPS 병목·폼팩터 | [docs/hardware_inference.md](hardware_inference.md) |
 | 목적 축을 **무엇으로 어떻게 재는가** | [scripts/metrics.py](../scripts/metrics.py) |
