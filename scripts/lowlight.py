@@ -12,6 +12,8 @@ arm 구성 (docs/lowlight_classical.md 6장)
     A1      CLAHE(타일 적응) + 감마
     A2      AGCWD(전역 적응 감마, Huang 2013)
     +bf     위에 bilateral 노이즈 억제를 얹은 변형
+    +ts/+td/+a3   **A3 시간축** — 톤커브 평활 / 모션적응 노이즈 억제 / 둘 다.
+            연속 프레임 전용이며 `arm.is_temporal` 로 구분한다 (→ 아래 A3 절)
 
 설계 메모
 - **두 톤커브 모두 LAB L 채널에서 동작한다.** AGCWD 원논문은 HSV V 를 쓰지만,
@@ -20,8 +22,8 @@ arm 구성 (docs/lowlight_classical.md 6장)
 - **노이즈 억제는 직교 스테이지다.** data.md 의 A안은 "CLAHE + 감마 + 노이즈 억제"로
   묶여 있었으나, 그러면 A1·A2 비교에 노이즈 처리가 섞여 들어간다. 분리해야
   가설 H2(고전의 노이즈 증폭이 탐지를 해치는가)를 arm 차이로 직접 읽을 수 있다.
-- 상태를 갖지 않는다. 시간축 처리(A3, → lowlight_classical.md 3장)는 상태가 필요하므로
-  별도 스테이지로 추가한다.
+- 공간축 스테이지는 상태를 갖지 않는다. 시간축 처리(A3, → lowlight_classical.md 3장)만
+  상태를 가지며 `TemporalArm` 으로 분리했다 — 정지영상 하네스에 섞이지 않게 하기 위해서다.
 """
 
 from __future__ import annotations
@@ -229,6 +231,148 @@ class Bilateral:
 
 
 # --------------------------------------------------------------------------
+# 시간축 스테이지 (A3) — 상태를 갖는다. **연속 프레임에만 유효하다**
+#
+# 정지영상 벤치마크로는 원리적으로 검출되지 않는 두 결함을 다룬다
+# (→ lowlight_classical.md 3장):
+#
+#   3-1 플리커      A1·A2·D1 은 프레임마다 톤커브를 다시 계산한다. 가로등이 들고
+#                   나며 밝기 분포가 급변하면 화면 전체가 출렁인다. 대상이
+#                   광과민 저시력자라 이건 화질이 아니라 **안전 문제**다.
+#   3-2 시간축 노이즈  센서 노이즈는 프레임 간 무상관, 신호는 상관 → 누적하면
+#                   SNR 이 √N 개선된다. 공간축 필터(`bf`)와 달리 **해상도를
+#                   희생하지 않는다.** 미달 축이던 색 σ 가 정확히 이것이 다루는 것.
+#
+# ⚠️ 두 스테이지 모두 이전 프레임에 의존한다. 서로 무관한 정지영상 목록에
+#    돌리면 **의미 없는 값**이 나온다. `Arm.is_temporal` 로 구분하고,
+#    시퀀스가 바뀔 때마다 `arm.reset()` 을 부를 것.
+# --------------------------------------------------------------------------
+
+
+def _luma(bgr: Frame) -> np.ndarray:
+    return cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+
+
+class TemporalToneSmooth:
+    """3-1 대응 — arm 의 **실효 톤커브를 시간축 IIR 로 평활**한다.
+
+    왜 파라미터가 아니라 실효 커브인가
+        "톤커브 파라미터를 평활하라"가 정석이지만, CLAHE 는 타일마다 커브가 다르고
+        Drago 는 OpenCV 내부에서 계산돼 **꺼낼 파라미터가 없다.** 대신 프레임마다
+        입력 휘도 → 출력 휘도의 **경험적 전달곡선**(256엔트리)을 재고 그것을 평활한다.
+        오퍼레이터 종류와 무관하게 동작하고, 조합 arm(`D1A1`)에도 그대로 붙는다.
+
+    보정은 **이득(곱)** 으로 넣는다 — 평활 커브 / 현재 커브 비율만큼 출력을 스케일한다.
+    LAB 왕복(≈4ms)을 피하려고 곱으로 택했고, 국소 구조는 비율이 화소마다 같은 방향
+    으로 작용하므로 CLAHE 가 만든 대비는 보존된다.
+
+    한 극(one-pole) IIR 의 계수는 컷오프에서 유도한다:  a = 1 - exp(-2π·fc/fs).
+    업계 관행 컷오프는 0.5Hz 수준 (→ lowlight_classical.md 3-1).
+    """
+
+    #: 전달곡선 통계용 화소 솎음 간격. 256엔트리 평균을 구하는 데 전 화소는 불필요하고
+    #: bincount 가 이 스테이지 비용의 대부분이었다 (4 → 화소 1/16).
+    SUBSAMPLE = 4
+    GAIN_LIMIT = (0.5, 2.0)   # 커브가 0 근처일 때 이득이 발산하는 것을 막는다
+
+    def __init__(self, fps: float = 16.0, cutoff_hz: float = 0.5):
+        self.alpha = float(1.0 - np.exp(-2.0 * np.pi * cutoff_hz / max(fps, 1e-6)))
+        self.params = {"fps": fps, "cutoff_hz": cutoff_hz, "alpha": round(self.alpha, 4)}
+        self._curve: np.ndarray | None = None
+
+    def reset(self) -> None:
+        self._curve = None
+
+    @classmethod
+    def _transfer(cls, l_in: np.ndarray, l_out: np.ndarray) -> np.ndarray:
+        """입력 휘도값별 출력 휘도 평균. 빈 구간은 이웃에서 보간한다."""
+        s = cls.SUBSAMPLE
+        flat_in = l_in[::s, ::s].ravel()
+        flat_out = l_out[::s, ::s].ravel().astype(np.float64)
+        cnt = np.bincount(flat_in, minlength=256).astype(np.float64)
+        acc = np.bincount(flat_in, weights=flat_out, minlength=256)
+        seen = cnt > 0
+        if not seen.any():
+            return np.arange(256, dtype=np.float64)
+        curve = np.empty(256, dtype=np.float64)
+        curve[seen] = acc[seen] / cnt[seen]
+        idx = np.arange(256)
+        curve[~seen] = np.interp(idx[~seen], idx[seen], curve[seen])
+        return curve
+
+    def __call__(self, src: Frame, out: Frame) -> Frame:
+        l_in = _luma(src)
+        curve = self._transfer(l_in, _luma(out))
+
+        if self._curve is None:          # 첫 프레임 — 평활할 과거가 없다
+            self._curve = curve
+            return out
+        self._curve = self.alpha * curve + (1.0 - self.alpha) * self._curve
+
+        lo, hi = self.GAIN_LIMIT
+        gain = np.clip(self._curve / np.maximum(curve, 1.0), lo, hi).astype(np.float32)
+        g = cv2.LUT(l_in, gain)                       # 화소별 이득 (1ch float32)
+        scaled = out.astype(np.float32) * g[:, :, None]
+        return np.clip(scaled, 0, 255).astype(np.uint8)
+
+
+class MotionAdaptiveDenoise:
+    """3-2 대응 — 이전 출력과 IIR 블렌딩하되 **움직인 화소는 섞지 않는다**.
+
+        out = a·cur + (1-a)·prev,   a = clip(a_min + (1-a_min)·d/thresh, a_min, 1)
+
+    `d` 는 프레임 차분(평활)이다. 정지 영역은 a→a_min 이라 강하게 누적돼 노이즈가
+    √ 로 줄고, 움직이는 영역은 a→1 이라 **고스팅이 생기지 않는다.**
+
+    a_min=0.35 이면 정지 영역의 실효 누적은 약 2.9프레임이라 σ 가 이론상 46% 수준
+    으로 내려간다. `bf` 와 달리 공간 해상도를 전혀 깎지 않는다.
+
+    구현 메모 — 비용이 곧 채택 가능성이다
+        `bf` 를 대체하려는 스테이지라 `bf` 보다 비싸면 의미가 없다. 그래서
+        (1) 이전 프레임을 uint8 로 들고 있어 매 프레임 형변환을 피하고,
+        (2) 움직임은 **그레이 1채널**에서만 재며,
+        (3) 블렌딩을 numpy 가 아니라 cv2(SIMD·멀티스레드) 연산으로 돌린다.
+    """
+
+    #: 기본값은 rec 38 스윕(2026-08-02)에서 고른 중간값이다. 0.35/12 는 억제가
+    #: 거의 없었고(시간축σ 6.05→5.45), 0.15/40 은 억제는 크지만 동적부 디테일
+    #: 유지율이 0.89→0.83 으로 떨어져 **움직이는 보행자를 지우는** 쪽이었다.
+    def __init__(self, blend_min: float = 0.25, motion_thresh: float = 24.0):
+        self.blend_min = float(blend_min)
+        self.motion_thresh = float(motion_thresh)
+        self.params = {"blend_min": blend_min, "motion_thresh": motion_thresh}
+        self._prev: np.ndarray | None = None       # uint8 BGR
+
+    def reset(self) -> None:
+        self._prev = None
+
+    def __call__(self, bgr: Frame) -> Frame:
+        if self._prev is None or self._prev.shape != bgr.shape:
+            self._prev = bgr.copy()
+            return bgr
+
+        # 움직임 세기 — 그레이 차분을 살짝 평활해 노이즈가 움직임으로 오인되지 않게
+        d = cv2.blur(cv2.absdiff(_luma(bgr), _luma(self._prev)), (3, 3))
+        a = cv2.LUT(d, self._alpha_lut())                      # 1ch float32
+
+        prev_f = self._prev.astype(np.float32)
+        delta = cv2.multiply(cv2.subtract(bgr.astype(np.float32), prev_f),
+                             cv2.merge([a, a, a]))
+        out = cv2.add(prev_f, delta).clip(0, 255).astype(np.uint8)
+        self._prev = out
+        return out
+
+    def _alpha_lut(self) -> np.ndarray:
+        """차분값(0~255) → 블렌딩 계수. 매 프레임 화소 연산 대신 256엔트리 LUT."""
+        if getattr(self, "_lut", None) is None:
+            d = np.arange(256, dtype=np.float32)
+            self._lut = np.clip(
+                self.blend_min + (1.0 - self.blend_min) * d / self.motion_thresh,
+                self.blend_min, 1.0).astype(np.float32)
+        return self._lut
+
+
+# --------------------------------------------------------------------------
 # arm 조립
 # --------------------------------------------------------------------------
 
@@ -236,9 +380,14 @@ class Bilateral:
 class Arm:
     """스테이지를 순서대로 적용하는 arm. 무처리 arm 은 stages 가 빈 리스트다."""
 
+    is_temporal = False
+
     def __init__(self, name: str, stages: Sequence[Stage] = ()):
         self.name = name
         self.stages = list(stages)
+
+    def reset(self) -> None:
+        """시퀀스 경계에서 호출. 상태 없는 arm 은 할 일이 없다."""
 
     def __call__(self, bgr: Frame) -> Frame:
         out = bgr
@@ -256,6 +405,43 @@ class Arm:
 
     def __repr__(self) -> str:
         return f"<Arm {self.name}: {self.describe()}>"
+
+
+class TemporalArm(Arm):
+    """A3 — 공간축 arm 위에 시간축 스테이지를 얹은 arm.
+
+    ⚠️ **연속 프레임에만 유효하다.** 서로 무관한 정지영상에 돌리면 이전 프레임이
+    남의 장면이라 값이 무의미하다. 시퀀스가 바뀌면 `reset()` 을 부를 것.
+    인터페이스는 `bgr -> bgr` 그대로라 ③ 앞단 결선은 달라지지 않는다.
+    """
+
+    is_temporal = True
+
+    def __init__(self, name: str, stages: Sequence[Stage] = (), *,
+                 tone: bool = True, denoise: bool = True,
+                 fps: float = 16.0, cutoff_hz: float = 0.5,
+                 blend_min: float = 0.35, motion_thresh: float = 12.0):
+        super().__init__(name, stages)
+        self.tone = TemporalToneSmooth(fps, cutoff_hz) if tone else None
+        self.denoise = MotionAdaptiveDenoise(blend_min, motion_thresh) if denoise else None
+
+    def reset(self) -> None:
+        for s in (self.tone, self.denoise):
+            if s is not None:
+                s.reset()
+
+    def __call__(self, bgr: Frame) -> Frame:
+        out = super().__call__(bgr)
+        if self.tone is not None:
+            out = self.tone(bgr, out)      # 실효 톤커브 평활은 원본이 필요하다
+        if self.denoise is not None:
+            out = self.denoise(out)
+        return out
+
+    def describe(self) -> str:
+        extra = [s.__class__.__name__ + f"({', '.join(f'{k}={v}' for k, v in s.params.items())})"
+                 for s in (self.tone, self.denoise) if s is not None]
+        return " → ".join([super().describe()] + extra)
 
 
 _BUILDERS: dict[str, Callable[[], Arm]] = {
@@ -285,6 +471,26 @@ _BUILDERS: dict[str, Callable[[], Arm]] = {
     # 해상도 하향(640×360) 또는 셰이더 이식이 전제다 (→ 6-5).
     "D1A1": lambda: Arm("D1A1", [Tonemap("drago"), CLAHE(gamma=1.0)]),
     "D1A1+bf": lambda: Arm("D1A1+bf", [Tonemap("drago"), CLAHE(gamma=1.0), Bilateral()]),
+    # ---- A3 시간축 (연속 프레임 전용) ------------------------------------
+    # 접미사 의미 — `bf` 를 직교 스테이지로 분리했던 것과 같은 이유로 둘을 쪼갠다.
+    #   +ts  톤커브 시간축 평활만 (플리커)
+    #   +td  모션적응 시간축 노이즈 억제만
+    #   +a3  둘 다 = **`bf` 를 대체하려는 후보**
+    "A1+ts": lambda: TemporalArm("A1+ts", [CLAHE()], tone=True, denoise=False),
+    "A1+td": lambda: TemporalArm("A1+td", [CLAHE()], tone=False, denoise=True),
+    "A1+a3": lambda: TemporalArm("A1+a3", [CLAHE()]),
+    "D1A1+ts": lambda: TemporalArm(
+        "D1A1+ts", [Tonemap("drago"), CLAHE(gamma=1.0)], tone=True, denoise=False),
+    "D1A1+td": lambda: TemporalArm(
+        "D1A1+td", [Tonemap("drago"), CLAHE(gamma=1.0)], tone=False, denoise=True),
+    "D1A1+a3": lambda: TemporalArm(
+        "D1A1+a3", [Tonemap("drago"), CLAHE(gamma=1.0)]),
+    # rec 38 실측 결론(2026-08-02): `+td` 는 `bf` 를 **대체하지 못한다** — 공간
+    # 노이즈 두 축에서 모두 지고 더 비싸다. 반면 `+ts` 는 플리커를 낮추면서
+    # 동적부 디테일을 거의 안 깎는다(0.99×). 그래서 실사용 후보는 둘의 합이다.
+    "D1A1+bf+ts": lambda: TemporalArm(
+        "D1A1+bf+ts", [Tonemap("drago"), CLAHE(gamma=1.0), Bilateral()],
+        tone=True, denoise=False),
 }
 
 ARM_NAMES = tuple(_BUILDERS)

@@ -24,10 +24,34 @@
     val 이 같은 구성이라 그 지름길이 검출되지 않는다. 실제 판정은 **한 프레임에 보도·
     계단·보행자가 함께 있는 자체 촬영 야간분(`C5`)** 에서 해야 한다 (→ TODO.md).
 
+★ C4b — NightOwls 를 학습에 투입 (2026-08-02)
+    C4 는 NightOwls held-out(rec 34)에서 person mAP50 0.127 · recall 0.195 로 무너졌다.
+    학습 데이터를 바꾼 두 런을 **같은 설정으로** 돌려 원인을 가린다.
+
+        c4b_loli6000   LoLI 6,000 + NightOwls 4,819 + StairNet   (실야간 박스 26.9%)
+        c4b_loli0      LoLI 없음  + NightOwls 4,819 + StairNet   (실야간 박스 100%)
+
+    두 데이터셋은 **val 이 동일**하고 train 만 다르다. 판정은 개발 val 이 아니라
+    held-out 인 NightOwls rec 34 에서 한다 (→ scripts/eval_nightowls.py).
+
+⚠️ **Windows 에서 `--cache ram` 은 학습을 죽인다** (2026-08-02 실측)
+    `c4b_loli0`(7,489장)에 `cache='ram'` 을 걸었더니 train 6.5GB + val 1.6GB 를 캐시한 뒤
+    **epoch 1 검증 중 `DataLoader worker exited unexpectedly` 로 크래시**했다.
+    Windows 는 worker 를 fork 가 아니라 **spawn** 으로 띄우므로 캐시를 담은 데이터셋이
+    worker 마다 복제된다 — 8.1GB × (1+4) 로 메모리가 터진다.
+
+    `c4b_loli6000`(14,089장)은 21.5GB 가 필요해 ultralytics 가 캐시를 **거부**한 덕에
+    살아남았다. 즉 **데이터가 작을수록 위험하다** — 캐시가 되는 크기가 오히려 함정이다.
+
+    디스크 병목은 캐시가 아니라 **NightOwls PNG→JPG 변환**(13.78 → 1.16 GiB)으로 이미
+    해소했다 (→ scripts/build_detect_dataset.py). 기본값은 `none` 이다.
+
 사용:
     uv run python scripts/train_detect.py                    # 기본 (YOLO11n, 100ep)
     uv run python scripts/train_detect.py --model yolo11s.pt
     uv run python scripts/train_detect.py --epochs 50 --batch 8
+    uv run python scripts/train_detect.py --data outputs/datasets/detect_v2_loli6000/data.yaml \
+        --name c4b_loli6000                                 # C4b 런1
 """
 
 from __future__ import annotations
@@ -51,6 +75,8 @@ def parse_args():
     p.add_argument("--batch", type=int, default=16,
                    help="VRAM 8GB 기준. OOM 이면 8 로 내릴 것")
     p.add_argument("--workers", type=int, default=4, help="Windows 는 과도하면 불안정")
+    p.add_argument("--cache", default="none", choices=["ram", "disk", "none"],
+                   help="⚠️ Windows 에서 'ram' 을 쓰지 말 것 — 아래 주의 참고")
     p.add_argument("--name", default="c4_baseline")
     p.add_argument("--seed", type=int, default=0)
     return p.parse_args()
@@ -82,6 +108,7 @@ def main() -> None:
         imgsz=args.imgsz,
         batch=args.batch,
         workers=args.workers,
+        cache=False if args.cache == "none" else args.cache,
         device=0,
         seed=args.seed,
         deterministic=True,
