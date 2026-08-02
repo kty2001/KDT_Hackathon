@@ -56,7 +56,9 @@ uv run python scripts/train_detect.py                     # C4 — ③ 탐지 ba
 uv run python scripts/eval_nightowls.py --recordings 34 --drop-unlabeled-person
                                                           # ③ 야간 held-out 정직 평가
 uv run python scripts/compare_detect.py                   # C4b — before/after 일괄 판정
+uv run python scripts/arm_detect_eval.py                  # C7 — ② arm × ③ 탐지 mAP 판정
 uv run python scripts/temporal_eval.py                    # W1 — ② A3 시간축(플리커·고스팅)
+uv run python scripts/pipeline_demo.py                    # ②→③→④ end-to-end 데모 영상
 uv run python scripts/emphasize.py                        # ④ 강조 렌더 데모 (②→③→④ 연결)
 ```
 

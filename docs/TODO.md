@@ -133,7 +133,7 @@ flowchart TD
 | **C4b** | ✅ ~~**재학습 — NightOwls 를 학습에 투입**~~ — **완료 (8/2). 두 결함 모두 해결.** held-out(rec 34)에서 person mAP50 **0.127→0.691** · recall **0.195→0.625**, `stairs` 야간 오탐 **7.7%→0.0%**. ★ **LoLI 를 빼도 성능 동점**이라 "LoLI 가 오염원"이라는 진단은 절반 수정됐다 (→ [detection.md 6-7](detection.md)) | 완료 | 🖥️ | 팀원1 | [detection.md 6장](detection.md) |
 | **C5** | **야간 평가셋 확정** — 자체 촬영분을 주 평가셋으로 승격 | C2, C3 | 💻 | 팀원3·팀장 | [data.md 2-3-3 ⚠️⚠️](data.md) |
 | **C6** | ✅ ~~**② 단독 FPS 실측 → 1차 게이트 판정**~~ — **완료 (8/1)**, 해상도 × 목적 축까지 확장 (`scripts/resolution_sweep.py`). 잔여는 밴드 정밀화 or `C11` 이관 | 완료 | 🖥️ | 팀장 | [lowlight_classical.md 6-6](lowlight_classical.md) |
-| **C7** | **② 4-arm mAP 판정** — `무처리`/A/B/C | **C4 + C5 + C6** ← 셋 다 필요 | 🖥️ | 팀장 | [data.md 2-3-3](data.md) |
+| **C7** | ✅ ~~**② 4-arm mAP 판정**~~ — **1차 완료 (8/2), NightOwls rec 34 held-out 기준.** 탐지 앞단은 **무처리가 1위**이고 ②를 붙이면 `stairs` 오탐이 **0.1%→5.7%** 로 복귀 → 🗣️ **표시/탐지 경로 분리 확정** (→ [detection.md 7장](detection.md)). **잔여: `C5` 자체 촬영분에서 재판정** (대시캠 ≠ 보행 시점) | C5 대기 | 🖥️ | 팀장 | [data.md 2-3-3](data.md) |
 | **C8** | 🗣️ **회의 — ② 처리 방식 확정** (FPS 예산·판정 기준·표시/탐지 분리) | C7 | — | 전원 | [data.md 2-3-4](data.md) |
 | **C9** | **①②③④ 파이프라인 통합** | C8 + P1·P2·P3 | 💻🖥️ | 팀장 | README 2장 |
 | **C10** | **ONNX export · 모바일 런타임 이식** (QNN/NNAPI/Core ML) | C9 | 🖥️📱 | 팀장·팀원2 | [hardware_inference.md 1장](hardware_inference.md) |

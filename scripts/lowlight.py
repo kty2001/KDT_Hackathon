@@ -312,8 +312,9 @@ class TemporalToneSmooth:
         lo, hi = self.GAIN_LIMIT
         gain = np.clip(self._curve / np.maximum(curve, 1.0), lo, hi).astype(np.float32)
         g = cv2.LUT(l_in, gain)                       # 화소별 이득 (1ch float32)
-        scaled = out.astype(np.float32) * g[:, :, None]
-        return np.clip(scaled, 0, 255).astype(np.uint8)
+        # cv2.multiply 가 포화 캐스팅까지 한 번에 한다 — numpy 로 하면
+        # float 변환·곱·clip·uint8 캐스팅이 각각 전체 프레임을 훑어 3배 비싸다.
+        return cv2.multiply(out, cv2.merge((g, g, g)), dtype=cv2.CV_8U)
 
 
 class MotionAdaptiveDenoise:

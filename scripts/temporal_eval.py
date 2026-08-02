@@ -152,16 +152,22 @@ def run_arm(name: str, seq: list[np.ndarray], masks: list[np.ndarray],
     means: list[float] = []
     lumas: list[np.ndarray] = []
     sig_l = sig_c = 0.0
-    t0 = time.perf_counter()
+    elapsed = 0.0
     for f in seq:
+        # ⚠️ 타이머는 **arm 호출만** 감싼다. 예전에는 루프 전체를 쟀는데 지표
+        # 계산(luma·noise_absolute)이 통째로 섞여 들어가 `none` 이 4.7ms 로
+        # 나왔다 — 무처리 arm 의 비용은 0 에 가까워야 한다 (2026-08-02 수정).
+        t0 = time.perf_counter()
         out = arm(f)
+        elapsed += time.perf_counter() - t0
+
         L = luma(out).astype(np.float32)
         means.append(float(L.mean()))
         lumas.append(L)
         a, b = noise_absolute(out, noise_mask)
         sig_l += a
         sig_c += b
-    elapsed = (time.perf_counter() - t0) / len(seq) * 1000.0
+    elapsed = elapsed / len(seq) * 1000.0
 
     # 시간축 σ — 인접 프레임 차분의 σ / √2 (정지 화소에 국한)
     diffs = [(lumas[i + 1] - lumas[i])[stat] for i, (stat, _) in enumerate(masks)]

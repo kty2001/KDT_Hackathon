@@ -22,6 +22,8 @@
 | `train_detect.py` | YOLO11n 학습 | `--data` · `--name` · `--cache`(**Windows 는 `none` 유지**) |
 | `eval_nightowls.py` | 야간 정직 평가 | `--recordings 34 --drop-unlabeled-person` ← **판정 표준 조합** |
 | `compare_detect.py` | ★ before/after 가중치를 **같은 자로** 일괄 판정 + `stairs` 오탐 | `--runs a,b,c` |
+| `arm_detect_eval.py` | ★ C7 — **② arm 을 앞단에 붙였을 때 ③ 가 좋아지는가**. `표시/탐지 분리` 판정의 근거 | `--arms none D1A1+bf` |
+| `pipeline_demo.py` | ②→③→④ **end-to-end 동영상**. C9 통합 사전검증 + 시연 소재 | `--start` · `--detect-every` · `--fused` |
 
 ## ② 저조도 실험 하네스
 
