@@ -20,6 +20,7 @@
 | ② 고전 기법 — 지표·arm 순위·속도·**A3 시간축** | [docs/lowlight_classical.md](docs/lowlight_classical.md) |
 | ② 목적 축을 **무엇으로 어떻게 재는가** (지표 정의·결함 이력) | [scripts/metrics.py](scripts/metrics.py) — `uv run python scripts/metrics.py` |
 | 실시간 성능·양자화·폼팩터 검토 | [docs/hardware_inference.md](docs/hardware_inference.md) |
+| ★ **저조도 계단 탐지가 완료됐는가** (야간/주간·도메인 격차·② 오탐) | [notebooks/stairs_night_review.ipynb](notebooks/stairs_night_review.ipynb) |
 | 예측·arm 결과를 **눈으로 확인** | `notebooks/` — [detect_c4_review](notebooks/detect_c4_review.ipynb) · [lowlight_arms_review](notebooks/lowlight_arms_review.ipynb) · [lowlight_lol_review](notebooks/lowlight_lol_review.ipynb) · [stair_hybrid_baseline](notebooks/stair_hybrid_baseline.ipynb) |
 | 종결된 실험·결정의 원문 | [docs/archive/](docs/archive/) |
 | 환경 셋업·실행 방법 | 이 문서 [개발 환경](#개발-환경) |
