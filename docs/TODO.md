@@ -345,6 +345,6 @@ zip 은 D드라이브에 유지(재다운로드 53.5 GiB). D 여유 257.4 GiB.
 | ② 고전 기법 지형도·arm 실측·**지표 재설계** | [docs/lowlight_classical.md](lowlight_classical.md) |
 | ③ 탐지 — 데이터 구성·baseline·야간 검증·판정 | [docs/detection.md](detection.md) |
 | ③ 예측 결과 육안 검토 | [notebooks/detect_c4_review.ipynb](../notebooks/detect_c4_review.ipynb) |
-| ② arm 육안 비교(LOL 기준) 안내 | [docs/lowlight_classical_result.md](lowlight_classical_result.md) |
+| ② arm 육안 비교(LOL 기준) 안내 | [docs/archive/lowlight_lol_notebook_guide.md](archive/lowlight_lol_notebook_guide.md) |
 | 모바일 런타임·양자화·FPS 병목·폼팩터 | [docs/hardware_inference.md](hardware_inference.md) |
 | 목적 축을 **무엇으로 어떻게 재는가** | [scripts/metrics.py](../scripts/metrics.py) |
