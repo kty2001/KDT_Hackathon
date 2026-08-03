@@ -72,7 +72,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from nightowls_yolo import NightOwlsIndex, write_data_yaml
+from nightowls_yolo import CLASS_NAMES, NightOwlsIndex, write_data_yaml  # noqa: F401
 
 ROOT = Path(__file__).resolve().parent.parent
 LOLI = ROOT / "data/LoLI-Street/LoLI-Street Dataset"
@@ -83,7 +83,10 @@ NO_JSON = NIGHTOWLS / "nightowls_validation.json"
 NO_JPG = ROOT / "outputs/datasets/nightowls_jpg"
 DST = ROOT / "outputs/datasets/detect_v1"
 
-CLASS_NAMES = {0: "person", 1: "stairs"}
+AIHUB = ROOT / "outputs/datasets/aihub_yolo"
+
+# 클래스 배치는 nightowls_yolo.CLASS_NAMES 한 곳에만 있다 (여기서 다시 정의하지 말 것 —
+# 예전엔 같은 dict 가 두 파일에 복사돼 있어 클래스를 늘릴 때 한쪽만 고칠 위험이 있었다).
 PERSON_SRC_ID = 0  # LoLI-Street 는 COCO 인덱스 — person 이 0
 
 # 라벨 디렉토리는 split 마다 이름 규칙이 다르다 (원본 배포가 그렇다)
@@ -109,6 +112,9 @@ def parse_args():
                    help="LoLI 이미지를 어느 쪽에서 가져올지. 기본 low (야간 도메인)")
     p.add_argument("--nightowls", action="store_true",
                    help="NightOwls 를 학습에 투입한다 (C4b)")
+    p.add_argument("--aihub", action="store_true",
+                   help="AIHub 인도보행을 투입한다 — **bollard 의 유일한 소스** (C4c). "
+                        "선행: scripts/aihub_to_yolo.py. ⚠️ 주간 전용")
     p.add_argument("--no-train-recs", default="36,none,37",
                    help="NightOwls 학습용 recording (쉼표 구분)")
     p.add_argument("--no-val-recs", default="35",
@@ -215,6 +221,47 @@ def add_stairs(split: str, out_split: str, args) -> tuple[int, int]:
     return n, boxes
 
 
+def add_aihub(out_split: str, args) -> tuple[int, int, int]:
+    """AIHub 인도보행 변환본을 얹는다 → (이미지, person 박스, bollard 박스).
+
+    ⚠️ **주간 전용 소스다.** `C4` 가 "주간 학습 → 실야간 붕괴" 를 이미 보여 줬으므로
+    (→ detection.md 4-2), 이걸 넣은 뒤에도 판정은 반드시 held-out(rec 34)에서 한다.
+    `C4c` 게이트는 **person recall 0.609 회귀 없음**이다 — 볼라드를 얻자고 사람
+    성능을 깎으면 실패다.
+
+    분할은 aihub_to_yolo.py 가 이미 블록 단위로 나눠 뒀다(연속 프레임 누수 방지).
+    여기서 다시 섞지 않는다.
+    """
+    src_img = AIHUB / "images" / out_split
+    src_lab = AIHUB / "labels" / out_split
+    if not src_img.is_dir():
+        raise SystemExit(
+            f"AIHub 변환본이 없다: {src_img}\n"
+            "먼저 실행할 것: uv run python scripts/aihub_to_yolo.py")
+
+    out_img = args.dst / "images" / out_split
+    out_lab = args.dst / "labels" / out_split
+    out_img.mkdir(parents=True, exist_ok=True)
+    out_lab.mkdir(parents=True, exist_ok=True)
+
+    n = n_person = n_bollard = 0
+    for img in sorted(src_img.glob("*")):
+        lab = src_lab / f"{img.stem}.txt"
+        if not lab.is_file():
+            continue
+        link_or_copy(img, out_img / img.name)
+        text = lab.read_text(encoding="utf-8")
+        (out_lab / f"{img.stem}.txt").write_text(text, encoding="utf-8")
+        for row in text.splitlines():
+            if not row.strip():
+                continue
+            cid = int(float(row.split()[0]))
+            n_person += cid == 0
+            n_bollard += cid == 2
+        n += 1
+    return n, n_person, n_bollard
+
+
 def ensure_jpg(names: list[str], quality: int) -> int:
     """NightOwls PNG → JPG 캐시. 이미 있으면 건너뛴다. (새로 변환한 장수)"""
     from PIL import Image
@@ -268,7 +315,8 @@ def main() -> None:
     use_loli_train = args.loli_all or args.loli_n > 0
 
     print("=" * 78)
-    print("③ 통합 탐지 데이터셋 (person + stairs)")
+    print("③ 통합 탐지 데이터셋 — 클래스 "
+          + " / ".join(f"{i} {n}" for i, n in sorted(CLASS_NAMES.items())))
     if use_loli_train:
         print(f"   LoLI 이미지 {args.image_src} · 라벨 {args.label_src}"
               f"{'  ★ 권장 조합' if (args.image_src, args.label_src) == ('low', 'high') else '  ⚠️ 비권장'}")
@@ -293,7 +341,7 @@ def main() -> None:
         idx = NightOwlsIndex(NO_JSON)
         available = {p.name for p in NO_IMAGES.glob("*")}
 
-    total_person = total_stairs = 0
+    total_person = total_stairs = total_bollard = 0
     for split, out_split, n, recs in (
             ("Train", "train", loli_n, args.no_train_recs),
             ("Val", "val", args.loli_val_n, args.no_val_recs)):
@@ -307,15 +355,26 @@ def main() -> None:
             ni, nb = add_nightowls(out_split, {r.strip() for r in recs.split(",") if r.strip()},
                                    args, idx, available)
             print(f"  NightOwls 이미지 {ni:,} · person 박스 {nb:,}  (실야간·손 라벨)")
+        ai = ap = ab = 0
+        if args.aihub:
+            ai, ap, ab = add_aihub(out_split, args)
+            print(f"  AIHub     이미지 {ai:,} · person 박스 {ap:,} · "
+                  f"bollard 박스 {ab:,}  (⚠️ 주간)")
         si, sb = add_stairs(out_split, out_split, args)
         print(f"  Stairs    이미지 {si:,} · stairs 박스 {sb:,}")
-        print(f"  합계      이미지 {li + ni + si:,} · 박스 {lb + nb + sb:,}")
+        print(f"  합계      이미지 {li + ni + ai + si:,} · 박스 {lb + nb + ap + ab + sb:,}")
+        person = lb + nb + ap
         if sb:
-            print(f"  클래스 균형 person:stairs = {(lb + nb) / sb:.1f} : 1")
-        if lb + nb:
-            print(f"  person 박스 중 실야간(NightOwls) 비중 {nb / (lb + nb):.1%}")
-        total_person += lb + nb
+            bal = f"person:stairs = {person / sb:.1f} : 1"
+            if ab:
+                bal += f"  ·  person:bollard = {person / ab:.1f} : 1"
+            print(f"  클래스 균형 {bal}")
+        if person:
+            print(f"  person 박스 중 실야간(NightOwls) 비중 {nb / person:.1%}"
+                  f"{f' · 주간(AIHub) {ap / person:.1%}' if ap else ''}")
+        total_person += person
         total_stairs += sb
+        total_bollard += ab
 
     loli_desc = ("train 제외" if not use_loli_train
                  else "전량" if loli_n == 0 else str(loli_n))
@@ -324,9 +383,18 @@ def main() -> None:
     yaml = write_data_yaml(
         args.dst, "scripts/build_detect_dataset.py", "images/train", "images/val",
         extra=f"LoLI 이미지={args.image_src}/라벨={args.label_src}/{loli_desc}"
-              f" · NightOwls={no_desc}")
+              f" · NightOwls={no_desc}"
+              f" · AIHub={'투입(주간·bollard)' if args.aihub else '미사용'}")
 
     print(f"\n출력: {args.dst}\n  {yaml}")
+    if args.aihub:
+        print(f"\n★ bollard 박스 총 {total_bollard:,}개 — **주간 전용 소스**다.")
+        print("   `C4c` 판정 게이트: held-out(rec 34) person recall 0.609 · stairs 오탐")
+        print("   0.2% 에 회귀가 없어야 한다. 볼라드를 얻자고 기존 성능을 깎으면 실패다.")
+        if total_bollard < 2000:
+            print(f"   ⚠️ {total_bollard:,}개는 **학습에 턱없이 부족하다**(NightOwls person 은")
+            print("      7,972개였다). 지금은 배선 검증용이고, 실학습은 전량 부분 다운로드")
+            print("      뒤에 한다 (→ data.md 3-1 · aihubshell 부분 다운로드).")
     print("\n⚠️ 이 val 은 **개발용**이다. 최종 판정은 held-out 인 NightOwls rec 34")
     print("   (uv run python scripts/eval_nightowls.py --recordings 34 "
           "--drop-unlabeled-person) 와 자체 촬영 야간분(`C5`) 이다.")

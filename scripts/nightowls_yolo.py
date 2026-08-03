@@ -32,9 +32,13 @@ BICYCLEDRIVER = 2
 MOTORBIKEDRIVER = 3
 IGNORE = 4
 
-CLASS_NAMES = {0: "person", 1: "stairs"}
+# 통합 클래스 배치 — **여기가 유일한 정의처**다. 데이터셋 빌더·평가·변환기가 전부
+# 이것을 임포트해 쓰므로, 소스마다 id 가 어긋나는 사고가 원천적으로 안 난다.
+# `bollard` 는 2026-08-03 확정(AIHub 인도보행이 유일 소스 → scripts/aihub_to_yolo.py).
+CLASS_NAMES = {0: "person", 1: "stairs", 2: "bollard"}
 PERSON_ID = 0
 STAIRS_ID = 1
+BOLLARD_ID = 2
 
 
 def rec_key(v) -> str:

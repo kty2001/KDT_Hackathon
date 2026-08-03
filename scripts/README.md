@@ -17,8 +17,9 @@
 | 파일 | 하는 일 | 주요 옵션 |
 |---|---|---|
 | `stairnet_to_bbox.py` | C1 — StairNet 선분 라벨 → YOLO BBox (계단 전체 1박스) | — |
+| `aihub_to_yolo.py` | AIHub 인도보행(CVAT XML) → YOLO. **`bollard` 유일 소스** · 29종 중 3클래스만 담는다 · **연속 프레임이라 블록 분할** | `--pole-as-bollard` · `--val-ratio` |
 | `extract_nightowls.py` | NightOwls zip 선택 해제 (전량 53.5GiB 대신 ~14GiB) | `--run` 없으면 계획만 출력 |
-| `build_detect_dataset.py` | 통합 데이터셋 생성. LoLI(low 이미지+**high 라벨**) + NightOwls + StairNet | `--nightowls` · `--loli-n 0`(train 제외) · `--dst` |
+| `build_detect_dataset.py` | 통합 데이터셋 생성. LoLI(low 이미지+**high 라벨**) + NightOwls + StairNet + AIHub | `--nightowls` · `--aihub` · `--loli-n 0`(train 제외) · `--dst` |
 | `train_detect.py` | YOLO11n 학습 | `--data` · `--name` · `--cache`(**Windows 는 `none` 유지**) |
 | `eval_nightowls.py` | 야간 정직 평가 | `--recordings 34 --drop-unlabeled-person` ← **판정 표준 조합** |
 | `compare_detect.py` | ★ before/after 가중치를 **같은 자로** 일괄 판정 + `stairs` 오탐 | `--runs a,b,c` |
@@ -42,6 +43,7 @@
 | 파일 | 하는 일 |
 |---|---|
 | `inspect_datasets.py` | `data/` 배치 후 무결성 검증 (데이터 추가 시마다) |
+| `label_stats.py` | YOLO 라벨 박스 통계 — 라벨 **규칙 역산**(StairNet) + 자체 촬영분 **검수**(`C3`). 경계 접촉률·작은 박스 비율이 판정 지표 (→ [labeling_stairs.md](../docs/labeling_stairs.md)) |
 
 ---
 

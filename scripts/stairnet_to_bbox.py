@@ -47,8 +47,12 @@ SRC = ROOT / "data/Stair dataset"
 DST = ROOT / "outputs/datasets/stairs_yolo"
 
 # 통합 모델의 클래스 배치 — LoLI-Street 동봉 라벨(COCO person=0)과 맞춘다.
-CLASS_NAMES = {0: "person", 1: "stairs"}
-STAIRS_ID = 1
+# 클래스 배치는 nightowls_yolo 한 곳에만 둔다 — 예전엔 이 dict 가 파일마다 복사돼
+# 있어서, 클래스를 늘릴 때 한쪽만 고치면 소스별로 id 가 어긋날 수 있었다.
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from nightowls_yolo import CLASS_NAMES, STAIRS_ID  # noqa: E402
 
 # 선분 끝점만으로 만든 박스는 계단 '면'보다 얇다. 디딤판 두께만큼 위아래로
 # 살짝 넓혀야 실제 계단 영역을 덮는다. 이미지 높이 대비 비율.
