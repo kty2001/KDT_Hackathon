@@ -25,6 +25,7 @@
 | `arm_detect_eval.py` | ★ C7 — **② arm 을 앞단에 붙였을 때 ③ 가 좋아지는가**. `표시/탐지 분리` 판정의 근거 | `--arms none D1A1+bf` |
 | `eval_stairs_night.py` | `stairs` 를 **야간/주간 갈라서** 평가 (개발 val 은 섞여 있어 야간 성능이 묻힌다) | `--arm D1A1+bf` |
 | `pipeline_demo.py` | ②→③→④ **end-to-end 동영상**. C9 통합 사전검증 + 시연 소재 | `--start` · `--detect-every` · `--fused` |
+| `export_onnx.py` | ★ 가중치 → **ONNX 배포 패키지**(onnx + metadata.json + README + zip). PT↔ONNX 정합성 검증 후 실패 시 종료코드 1 | `--imgsz` · `--opset` · `--nms` · `--check-n` |
 
 ## ② 저조도 실험 하네스
 

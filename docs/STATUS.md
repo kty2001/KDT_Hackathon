@@ -33,6 +33,7 @@
 | ③ 위험요소 탐지 | **YOLO11n 단일 모델** · **입력은 원본** | held-out mAP50 **0.684** · recall **0.609** · `stairs` 오탐 **0.2%**(rec34 2장)·0.0%(rec38) | ✅ 완료 (8/2) |
 | ④ 선택적 강조 | 이중 스트로크 비채움 렌더 | 박스당 **0.5ms** | ✅ 구현 · 실기기 검증 대기 |
 | **파이프라인 통합** | `scripts/pipeline_demo.py` | 데스크톱 end-to-end 동작 확인 (8/2) | ✅ 사전 검증 · 앱 이식 대기 |
+| **③ 앱 전달물** | ONNX FP32 · 640 고정 · NMS 제외 | `outputs/export/bammasil_det_c4b_loli0_640.zip` (9.2MB) · PT↔ONNX 일치 확인 | ✅ 공유 가능 (8/3) |
 | 앱 | — | — | ❌ **구현 0건** |
 
 **채택 가중치**: `outputs/detect/c4b_loli0/weights/best.pt`
@@ -86,6 +87,17 @@
    `build_detect_dataset.py` 가 실행을 거부하도록 막아 뒀다.
 6. **Windows 에서 `--cache ram` 금지.** worker 가 spawn 이라 캐시가 복제돼 죽는다.
 7. **Raw 데이터 수정 금지.** 산출물은 전부 `outputs/`(git 비추적), 이미지는 하드링크.
+8. **ultralytics 의 AutoUpdate 를 켜 둔 채 ONNX 추론을 돌리지 말 것** (8/3 실측).
+   `onnxruntime`(CPU) 이 없으면 **제멋대로 설치**해 `uv.lock` 밖 패키지를 끼워 넣는다.
+   이 프로젝트는 `onnxruntime-gpu` 를 쓰는데 **둘은 같은 디렉토리를 공유**해서, 나중에
+   CPU 판을 지우면 공용 파일까지 사라져 `onnxruntime` 이 통째로 망가진다
+   (`module has no attribute 'InferenceSession'`). 복구는 `uv sync --reinstall-package
+   onnxruntime-gpu`. 예방은 임포트 전 `YOLO_AUTOINSTALL=false` (→ `scripts/export_onnx.py`).
+9. **`.pt` 와 ONNX 를 같은 이미지로 비교할 때 파일 경로를 그대로 넘기지 말 것** (8/3).
+   ultralytics 는 `.pt` 에 **가변 rect 레터박스**(16:9 → 640×384), 고정 shape ONNX 에는
+   640×640 을 먹인다. 입력 해상도가 달라 비정사각 이미지에서 신뢰도가 0.1 씩 벌어지는데
+   이는 **변환 손실이 아니라 전처리 차이**다. 미리 정사각 레터박스한 배열을 양쪽에
+   똑같이 넣으면 좌표 오차 0.0001px 로 일치한다.
 
 ---
 
@@ -127,6 +139,7 @@
 
 | 항목 | 결과 |
 |---|---|
+| **③ ONNX 배포 패키지** (8/3) | `export_onnx.py` — onnx + 연동 README + metadata + zip 을 한 번에 굽고 **PT↔ONNX 정합성 검증**(좌표 0.0001px·conf 0 일치)까지 한다. FP32·640 고정·NMS 제외(모바일 NPU 호환). 앱팀 인수인계 문서는 [share 7장](share_yolo_c4b_20260803.md) |
 | **AIHub 인도보행 샘플 실측** (8/3) | 장애물 29종 · **계단 없음 · 야간 없음** — 일반 장애물 안건의 판단 근거 확보, 추가 시 진행 경로 확정 (→ [data.md 3-1](data.md)). 팀 공유 문서에도 반영 |
 | **`stairs` 야간/주간 분리 실측 + 검증 노트북** (8/2~3) | ★ StairNet 야간 76장 mAP50 **0.993** — **저조도 아닌 도메인이 문제** (→ 2절 4). 하네스 `eval_stairs_night.py` · 그림 [stairs_night_review.ipynb](../notebooks/stairs_night_review.ipynb) |
 | **`C7` ② arm × ③ mAP** (8/2) | ★ **표시/탐지 경로 분리 확정.** 탐지 앞단은 무처리가 1위이고, ②를 붙이면 `stairs` 오탐이 **0.1%→5.7%** 로 복귀. 4-4 의 "재현율 절반" 프리뷰는 **폐기**(실제 영향은 mAP50 −0.01~−0.04) |
