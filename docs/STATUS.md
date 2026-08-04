@@ -125,6 +125,13 @@
    640×640 을 먹인다. 입력 해상도가 달라 비정사각 이미지에서 신뢰도가 0.1 씩 벌어지는데
    이는 **변환 손실이 아니라 전처리 차이**다. 미리 정사각 레터박스한 배열을 양쪽에
    똑같이 넣으면 좌표 오차 0.0001px 로 일치한다.
+11. ★ **다른 머신으로 옮길 데이터셋의 `data.yaml` 에는 `path:` 를 넣지 말 것** (8/4 실측).
+    ultralytics 는 `path:` 가 **상대경로면 `settings['datasets_dir']` 기준**으로 푼다
+    (Colab 은 `/content/datasets`). 로컬에서는 우연히 맞아떨어지지만 zip 을 옮기는 순간
+    `images not found, missing path '/content/datasets/outputs/datasets/...'` 로 죽는다.
+    절대경로를 넣으면 이번엔 Windows 경로가 박혀 역시 못 쓴다. **`path:` 를 빼면
+    ultralytics 가 yaml 파일의 위치를 기준으로 잡아** 어느 머신에서든 동작한다
+    (`aihub_pack_for_colab.make_portable`). 로컬 전용 데이터셋은 지금처럼 절대경로여도 된다.
 
 ---
 

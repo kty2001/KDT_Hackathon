@@ -93,6 +93,9 @@ def parse_args():
                    help="긴 변 기준. 학습 입력과 같게 두면 정보 손실이 없다")
     p.add_argument("--quality", type=int, default=90, help="JPEG 품질")
     p.add_argument("--val-ratio", type=float, default=0.2)
+    p.add_argument("--max-images", type=int, default=0,
+                   help="장수 상한. **균등 간격으로 솎아 낸다**(앞부분만 자르지 않는다). "
+                        "0=전부. Drive 여유가 빠듯할 때 쓴다 — 장당 ~80KB")
     p.add_argument("--no-surface", action="store_true",
                    help="노면 stairs 를 아예 다루지 않는다")
     p.add_argument("--stairs", choices=["auto", "train", "eval"], default="auto",
@@ -216,6 +219,27 @@ def stairs_gate(records) -> tuple[bool, dict]:
 
 # ────────────────────────────────────────────────────────────── 출력
 
+def make_portable(yaml_path: Path) -> None:
+    """`data.yaml` 에서 `path:` 를 **지운다** — zip 이 다른 머신에서 풀려도 돌게.
+
+    ⚠️ 2026-08-04 실측한 함정. ultralytics 는 `path:` 를 이렇게 푼다.
+
+        절대경로  → 그대로 쓴다
+        상대경로  → **`settings['datasets_dir']` 기준** (Colab 은 `/content/datasets`)
+        없음      → **yaml 파일이 있는 디렉토리 기준** ← 우리가 원하는 것
+
+    즉 상대경로를 적어 두면 Colab 에서
+    `images not found, missing path '/content/datasets/outputs/datasets/...'`
+    로 죽고, 절대경로를 적으면 이번엔 **Windows 경로가 박혀** 역시 못 쓴다.
+    zip 으로 옮기는 데이터셋은 **`path:` 를 아예 빼는 것**이 유일하게 이식성 있는 답이다.
+    """
+    lines = [ln for ln in yaml_path.read_text(encoding="utf-8").splitlines()
+             if not ln.startswith("path:")]
+    lines.insert(1, "# path: 를 일부러 뺐다 — ultralytics 가 **이 파일의 위치**를 기준으로")
+    lines.insert(2, "# 잡으므로 어느 머신에서 풀든 동작한다 (→ aihub_pack_for_colab.py)")
+    yaml_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def resize_one(args_tuple) -> bool:
     from PIL import Image
 
@@ -237,9 +261,18 @@ def resize_one(args_tuple) -> bool:
 
 
 def emit(records: dict, dst: Path, args, prefix: str, img_index: dict,
-         val_ratio: float) -> dict:
+         val_ratio: float, max_images: int = 0) -> dict:
     """{이미지명: [YOLO 행]} → images/labels 트리. 반환: split 별 (이미지, 박스) 수."""
     names = sorted(records)                     # ★ 무작위 금지 — 연속 프레임이다
+
+    # 상한이 걸리면 **균등 간격**으로 솎는다. 앞에서 자르면 특정 촬영 구간만 남지만,
+    # 균등 추출은 전 구간을 유지하면서 인접 프레임(≈16fps 의 쌍둥이)을 걷어내
+    # 오히려 같은 장수당 정보량이 늘어난다. 정렬 순서는 그대로라 블록 분할은 유효하다.
+    if 0 < max_images < len(names):
+        step = len(names) / max_images
+        names = [names[int(i * step)] for i in range(max_images)]
+        print(f"  ⚠️ 장수 상한 {max_images:,} — {step:.1f} 프레임마다 하나씩 균등 추출")
+
     n_val = int(len(names) * val_ratio)
     splits = {"train": names[:len(names) - n_val], "val": names[len(names) - n_val:]}
 
@@ -381,13 +414,17 @@ def main() -> None:
                 obstacle.setdefault(name, []).extend(rows)
 
     print()
-    res = emit(obstacle, args.dst, args, "aihub", img_index, args.val_ratio)
+    res = emit(obstacle, args.dst, args, "aihub", img_index, args.val_ratio,
+               args.max_images)
+    n_out = sum(v[0] for v in res.values())
     for split, (i, b) in res.items():
         print(f"[{split}] 이미지 {i:,}장 · 박스 {b:,}개")
+    print(f"  예상 zip 크기 ≈ {n_out * 80 / 2**20:.2f} GiB  (장당 ~80KB 실측)")
 
     data_yaml = write_data_yaml(
         args.dst, "scripts/aihub_pack_for_colab.py", "images/train", "images/val",
         extra=f"AIHub 인도보행 · 긴 변 {args.imgsz}px · ⚠️ 주간 전용")
+    make_portable(data_yaml)
 
     eval_res = {}
     if surface_records and not stairs_in_train:
@@ -396,9 +433,9 @@ def main() -> None:
                 for name, W, H, boxes in surface_records}
         recs = {k: v for k, v in recs.items() if v}
         eval_res = emit(recs, eval_dst, args, "aihubsurf", img_index, 1.0)
-        write_data_yaml(eval_dst, "scripts/aihub_pack_for_colab.py",
-                        "images/val", "images/val",
-                        extra="노면 stairs — **평가 전용**. 학습에 넣지 말 것")
+        make_portable(write_data_yaml(
+            eval_dst, "scripts/aihub_pack_for_colab.py", "images/val", "images/val",
+            extra="노면 stairs — **평가 전용**. 학습에 넣지 말 것"))
         print(f"\n[평가 전용] {eval_dst} — val {eval_res.get('val', (0, 0))[0]:,}장")
 
     stats = {
