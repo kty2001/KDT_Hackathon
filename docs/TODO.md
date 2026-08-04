@@ -334,7 +334,8 @@ zip 은 D드라이브에 유지(재다운로드 53.5 GiB). D 여유 257.4 GiB.
 | **P4** B arm(Zero-DCE/SCI) 구현 · LoLI-Street 라벨 육안 검수 | 팀원1 | 🖥️ |
 | **P5** 골판지 하우징 제작 | 팀원3 | 🎥 |
 | 노트북 7절·10-4 **신 지표로 재실행** (지표 재설계 후속) | 팀장 | 💻 |
-| ★ **AIHub 이용 신청 → 라벨만 부분 다운로드**(장애물 + **노면**) → 분포 실측. `bollard` 학습과 `stairs` 원거리 측정이 **둘 다 여기에 매달려 있다** (→ [data.md 3-1-3](data.md)) | 팀장 | 🖥️ |
+| ★ **AIHub 이용 신청 → 정찰 다운로드**(`Bbox_1` 50043 + `Surface_1` 49954, 20GB) → `aihub_pack_for_colab.py --dry-run` 으로 분포 실측. `bollard` 학습과 `stairs` 원거리 측정이 **둘 다 여기에 매달려 있다**. ⚠️ **해외 차단이라 국내 PC 에서만 된다** (→ [data.md 3-1-3](data.md)) | 팀장 | 🖥️ **국내** |
+| 위가 끝나면 → `--zip` 으로 패키징(2~3GB) → Drive 업로드 → [notebooks/colab_aihub_train.ipynb](../notebooks/colab_aihub_train.ipynb) 로 학습. **GPU 없는 PC 에서도 되고 학습 PC 를 점유하지 않는다** | 팀장 | ☁️ |
 | ~~NightOwls 다운로드 완료 여부 확인 → 선택 해제~~ → ✅ 완료 (8/1). ~~잔여 W1·W4~~ → **W1 완료 (8/2, → [8장](lowlight_classical.md)). 잔여는 `W4`** | 팀장 | 🖥️ |
 
 ---

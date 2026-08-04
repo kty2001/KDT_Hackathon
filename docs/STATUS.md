@@ -107,13 +107,20 @@
    `build_detect_dataset.py` 가 실행을 거부하도록 막아 뒀다.
 6. **Windows 에서 `--cache ram` 금지.** worker 가 spawn 이라 캐시가 복제돼 죽는다.
 7. **Raw 데이터 수정 금지.** 산출물은 전부 `outputs/`(git 비추적), 이미지는 하드링크.
-8. **ultralytics 의 AutoUpdate 를 켜 둔 채 ONNX 추론을 돌리지 말 것** (8/3 실측).
+8. ★ **AI Hub 는 해외 IP 다운로드를 차단한다** (8/4 실측). Colab·해외 클라우드에서
+   `aihubshell` 을 돌리면 `502 · "해외에서의 데이터 다운로드를 제한"` 으로 끝난다.
+   우회는 이용정책 위반이라 하지 않는다 — **AIHub 취득은 국내 PC 에서만 가능**하고,
+   클라우드 GPU 를 쓰려면 **국내에서 받아 640 리사이즈해 옮기는** 경로뿐이다
+   (`scripts/aihub_pack_for_colab.py` → [data.md 3-1-3](data.md)).
+   같은 실측에서 하나 더 — **라벨과 원천이 안 갈려 있다.** 태스크별 10GB 통zip 뿐이라
+   "라벨 먼저 받아 분포 실측" 이 불가능하고, **태스크별 1번 zip 정찰**로 대체한다.
+9. **ultralytics 의 AutoUpdate 를 켜 둔 채 ONNX 추론을 돌리지 말 것** (8/3 실측).
    `onnxruntime`(CPU) 이 없으면 **제멋대로 설치**해 `uv.lock` 밖 패키지를 끼워 넣는다.
    이 프로젝트는 `onnxruntime-gpu` 를 쓰는데 **둘은 같은 디렉토리를 공유**해서, 나중에
    CPU 판을 지우면 공용 파일까지 사라져 `onnxruntime` 이 통째로 망가진다
    (`module has no attribute 'InferenceSession'`). 복구는 `uv sync --reinstall-package
    onnxruntime-gpu`. 예방은 임포트 전 `YOLO_AUTOINSTALL=false` (→ `scripts/export_onnx.py`).
-9. **`.pt` 와 ONNX 를 같은 이미지로 비교할 때 파일 경로를 그대로 넘기지 말 것** (8/3).
+10. **`.pt` 와 ONNX 를 같은 이미지로 비교할 때 파일 경로를 그대로 넘기지 말 것** (8/3).
    ultralytics 는 `.pt` 에 **가변 rect 레터박스**(16:9 → 640×384), 고정 shape ONNX 에는
    640×640 을 먹인다. 입력 해상도가 달라 비정사각 이미지에서 신뢰도가 0.1 씩 벌어지는데
    이는 **변환 손실이 아니라 전처리 차이**다. 미리 정사각 레터박스한 배열을 양쪽에
@@ -148,6 +155,7 @@
 | 스크립트가 뭘 하는지 | [../scripts/README.md](../scripts/README.md) | 4KB |
 | ★ **`stairs` 라벨을 어떻게 치는가** (`C3` 작업자용) | [labeling_stairs.md](labeling_stairs.md) | 7KB |
 | ★ **계단 탐지가 완료됐는가** (그림으로) | [../notebooks/stairs_night_review.ipynb](../notebooks/stairs_night_review.ipynb) | — |
+| ★ **AIHub 를 받아 학습까지** (Colab · GPU 없는 PC 에서도) | [../notebooks/colab_aihub_train.ipynb](../notebooks/colab_aihub_train.ipynb) | — |
 | 팀 공유 — ③ 훈련 결과 요약 + 회의 안건 | [share_yolo_c4b_20260803.md](share_yolo_c4b_20260803.md) | 6KB |
 | 종결된 실험·결정 원문 | [archive/](archive/) | — |
 
@@ -160,6 +168,7 @@
 
 | 항목 | 결과 |
 |---|---|
+| **AIHub 취득 경로 확정 — 국내 패키징 + Colab 학습** (8/4) | ★ **해외 차단**(3장 함정 8)으로 Colab 직접 다운로드가 막혀 역할을 나눴다. `scripts/aihub_pack_for_colab.py`(국내: 다운로드분 → YOLO 변환 + **640 리사이즈** + zip · **30GB → 2~3GB**) + `notebooks/colab_aihub_train.ipynb`(Drive zip → 학습 → Drive). **`uv` 환경 무관**(Colab 에서만 `%pip`). 640 축소는 **손실이 아니다** — 학습 입력이 어차피 640 이라 ultralytics 가 같은 크기로 줄인다(실측 장당 ~80KB). 변환은 `aihub_to_yolo.parse_xml`·`nightowls_yolo.CLASS_NAMES` 를 **그대로 재사용**(클래스 id 이중 정의 방지). ★ 판단 지점 2개가 스크립트에 박혀 있다 — **태스크별 1번 zip 정찰** · **노면 `stairs` StairNet 대조 게이트**(학습 투입/평가 전용 자동 판정). 샘플로 end-to-end 검증 완료(person 525·bollard 175 재현) |
 | **AIHub 노면 마스킹 `stairs` 검토 + 8/3 결론 정정** (8/4) | ★ 8/3 의 "AIHub 에 계단 없음"은 **장애물 태스크 한정**이었다 — 샘플의 bbox·polygon 이 **둘 다 29종 장애물 스키마**(polygon 570개도 car/pole/truck…)여서 **Surface Masking(노면 20종) 태스크를 아예 못 봤다.** 거기에 `caution_zone > stairs` 가 있다. **클래스 1 의 소스로 쓸 수 있다**(클래스 추가 아님 · 폴리곤→bbox 는 `C1` 과 같은 변환). ⚠️ 라벨의 뜻이 "노면 구역"이라 우리 "계단 전체 1박스"와 범위가 다를 수 있어 **StairNet 대조가 선행**. 부분 다운로드 목록에 **노면 라벨 전량** 추가 (→ [data.md 3-1-2·3-1-3](data.md)) |
 | **클래스 3종 확정 + AIHub 배선** (8/3) | `0 person` `1 stairs` `2 bollard`. `aihub_to_yolo.py`(CVAT XML→YOLO · **연속 프레임이라 블록 분할**) + `build_detect_dataset.py --aihub`. ★ 실측 판단 2건: **나머지 26종을 버려도 안전**(`pole` 648px vs `bollard` 75px 로 형태가 갈린다) · **AIHub person 은 반드시 라벨**(안 하면 진짜 "사람=배경") |
 | **🗣️ 회의 안건 3·4 처리** (8/3) | `C2` 촬영의 선행 조건 해소. `stairs` 라벨 정의 확정 → [labeling_stairs.md](labeling_stairs.md). ★ 실측으로 드러난 것: **StairNet 은 최소 크기에 답을 못 준다**(높이 32px 미만 **0.0%** · 면적 중앙 47.5%) — 하한을 두면 "계단=배경"을 가르치는 NightOwls `ignore` 함정의 재판이라 **하한 없음 + `ignore`** 로 정했다. 검수 도구 `scripts/label_stats.py` |
