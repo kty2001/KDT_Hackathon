@@ -83,17 +83,18 @@ JupyterLab UI가 필요하면 `uv add --dev jupyterlab` 후 `uv run jupyter lab`
 > 단계별 채택안·확정 수치·막힌 것·반복된 함정·문서 지도가 모두 거기 있다.
 > 7~8월 진행 로그 원문은 [docs/archive/progress_log_2026-07~08.md](docs/archive/progress_log_2026-07~08.md).
 
-**요약 (2026-08-02)** — 환경·데이터·② 방식·③ 탐지가 정리됐고, 남은 병목은 촬영과 앱이다.
+**요약 (2026-08-05)** — 환경·데이터·② 방식·③ 탐지가 정리됐고, 남은 병목은 **촬영과 앱**이다.
 
 | 단계 | 상태 |
 |------|------|
 | ① 눈부심 억제 | `D1`(Drago) 하이라이트 압축으로 후보 확보 — ②에 통합할지 🗣️ 회의 안건 |
-| ② 저조도 개선 | **고전 CV 확정**(8/1). 잠정 1위 `D1A1+bf`. ⚠️ **속도 게이트 미해결** |
-| ③ 위험요소 탐지 | ✅ **`C4b` 완료**(8/2) — 실야간 held-out recall **0.195→0.609**, `stairs` 오탐 **7.7%→0.2%** (채택 `c4b_loli0` 기준) |
+| ② 저조도 개선 | **고전 CV 확정**(8/1) · **표시 경로 전용**(8/2). 잠정 1위 `D1A1+bf+ts`. ⚠️ **속도 게이트 미해결** |
+| ③ 위험요소 탐지 | ✅ **`C4b` 완료**(8/2) — 실야간 held-out recall **0.195→0.609** · `stairs` 오탐 **7.7%→0.2%**. ONNX 로 앱팀 전달 완료(8/3). 🟡 `bollard` 는 데이터 확보(8/5) → `C4c` 학습 대기 |
 | ④ 선택적 강조 | ✅ 렌더 구현 완료 — 실기기 가독성 검증 대기 |
 | 앱 | ❌ **구현 0건 — 8월 4주 통합의 병목** |
 
-**다음 3수**: 🗣️ 회의 안건 3·4 → **`C2` 자체 야간 촬영**(크리티컬 패스 시작점) · **`P3` 앱 껍데기**.
+**다음 3수**: 🗣️ 회의 안건 7 → **`C2` 자체 야간 촬영**(크리티컬 패스 시작점) ·
+**`P3` 앱 껍데기** · **`C4c` 3클래스 학습**(병렬).
 자세한 순서·병렬성은 [docs/TODO.md](docs/TODO.md).
 
 ---
@@ -261,39 +262,28 @@ uv add <패키지>                  # pyproject.toml + uv.lock 자동 갱신
 
 ```
 ├── README.md                       기획 + 진행 현황 + 환경 (이 문서)
+├── CLAUDE.md                       AI 어시스턴트용 프로젝트 규칙
 ├── docs/
-│   ├── TODO.md                전체 작업 TODO — 크리티컬 패스·병렬 트랙·일정 배치
-│   ├── data.md                     데이터 확보 현황, 단계별 매핑, 계단 방식 결정 근거
-│   ├── detection.md                ③ 탐지 — 데이터 구성·C4 baseline·야간 검증·판정
-│   ├── hardware_inference.md       모바일 런타임·양자화, FPS 병목, 폼팩터 리스크
-│   ├── lowlight_classical.md       ② 고전 기법 지형도·720p 속도 실측, A arm 재정의 제안
+│   ├── STATUS.md              ★ 현재 상태 한 장 — **여기부터 읽는다**
+│   ├── TODO.md                     전체 작업 TODO — 크리티컬 패스·병렬 트랙·일정
+│   ├── data.md                     데이터 현황 · AI Hub · 계단 방식 결정 근거
+│   ├── detection.md                ③ 탐지 — 데이터 구성 · C4/C4b 판정 · 계단 도메인
+│   ├── lowlight_classical.md       ② 고전 기법 지형도 · arm 실측 · 지표 재설계
+│   ├── labeling_stairs.md          `stairs` 라벨 작업 가이드 (C3 작업자용)
+│   ├── hardware_inference.md       모바일 런타임·양자화 · FPS 병목 · 폼팩터
+│   ├── share_yolo_c4b_*.md         팀 공유 — ③ 결과 + 앱팀 인수인계
+│   ├── archive/                    📦 종결된 실험·결정 원문 (삭제하지 않고 옮긴다)
 │   └── 아이디어기획서_밤마실_20260729.pdf    원본 기획서 (수정 금지)
-├── scripts/
-│   ├── inspect_datasets.py         데이터셋 무결성 검증·인벤토리
-│   ├── extract_nightowls.py        NightOwls Validation 선택 해제 (전량 대신 ~14 GiB)
-│   ├── stairnet_to_bbox.py         C1 — StairNet 선분 라벨 → YOLO BBox 변환
-│   ├── nightowls_yolo.py           NightOwls 라벨 → YOLO 변환 공용 로직 (평가·학습이 공유)
-│   ├── build_detect_dataset.py     C4/C4b 준비 — person(LoLI·NightOwls) + stairs 통합 데이터셋
-│   ├── train_detect.py             C4/C4b — ③ 통합 탐지 학습
-│   ├── eval_nightowls.py           ③ NightOwls 야간 평가 (recording 단위 · stairs 오탐 집계)
-│   ├── compare_detect.py           C4b — before/after 가중치를 같은 자로 일괄 판정
-│   ├── probe_classical.py          ② 고전 기법 속도 프로브 (→ lowlight_classical.md 2장)
-│   ├── lowlight.py                 ② 고전 arm 구현 (A1·A2·D1·R1·L1 · 조합 · A3 시간축) + 레지스트리
-│   ├── metrics.py                  ② 목적 축 지표 정의 (글레어·대비·노이즈) + 자기검증
-│   ├── emphasize.py                ④ 선택적 강조 — BBox 경계선 대비색 렌더 + ③ 인터페이스
-│   ├── compare_lowlight.py         ② arm 비교 하네스 (속도·화질·노이즈·대조표)
-│   ├── night_eval.py               ② 야간 표본 평가 (풀 프로파일·글레어·대비·노이즈·속도)
-│   ├── temporal_eval.py            ② W1 — A3 시간축 실측 (플리커·시간축 σ·고스팅)
-│   └── resolution_sweep.py         ② C6 — 해상도 × arm 속도 게이트 + 목적 축 동시 측정
+├── scripts/                        → 목록·용도는 **scripts/README.md** 에 있다
 ├── notebooks/
-│   ├── detect_c4_review.ipynb      ③ C4 예측 결과 육안 검토 (지름길 검증·야간 실패 분석)
-│   ├── lowlight_arms_review.ipynb  ② arm 육안 검토 (톤커브·강광원/암부 확대·지표)
-│   ├── lowlight_lol_review.ipynb   ② arm 차이 설명 + LOL 원본/GT 비교 + 자체 촬영본(10절)
-│   └── stair_hybrid_baseline.ipynb 계단 고전 CV 검출 정량 평가 (→ 기각 근거)
-├── data/                           raw 데이터 (git 비추적, 원본 미수정)
+│   ├── detect_c4_review.ipynb      ③ 예측 결과 육안 검토 (지름길·야간 실패 분석)
+│   ├── stairs_night_review.ipynb   ③ 계단 야간 탐지가 완료됐는가 (그림으로)
+│   ├── colab_aihub_train.ipynb     ★ AIHub → Colab 학습 (GPU 없는 PC 에서도)
+│   ├── lowlight_arms_review.ipynb  ② arm 육안 검토 (톤커브·강광원/암부 확대)
+│   ├── lowlight_lol_review.ipynb   ② arm 차이 설명 + LOL 비교 + 자체 촬영본
+│   └── stair_hybrid_baseline.ipynb 계단 고전 CV 정량 평가 (→ 기각 근거)
+├── data/                           raw 데이터 (git 비추적, **원본 미수정**)
 ├── outputs/                        실험 산출물 (git 비추적)
-├── pyproject.toml / uv.lock        의존성 선언 + 버전 고정
-└── CLAUDE.md                       AI 어시스턴트용 프로젝트 규칙
 ```
 
 ### `data/` 배치

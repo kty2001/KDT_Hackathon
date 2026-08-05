@@ -18,7 +18,7 @@
 |---|---|---|
 | `stairnet_to_bbox.py` | C1 — StairNet 선분 라벨 → YOLO BBox (계단 전체 1박스) | — |
 | `aihub_to_yolo.py` | AIHub 인도보행(CVAT XML) → YOLO. **`bollard` 유일 소스** · 29종 중 3클래스만 담는다 · **연속 프레임이라 블록 분할** | `--pole-as-bollard` · `--val-ratio` |
-| `aihub_pack_for_colab.py` | ★ AIHub 다운로드분 → **Colab 으로 옮길 수 있는** 데이터셋(YOLO 변환 + **640 리사이즈** + zip, 30GB→2~3GB). **AIHub 해외 차단** 때문에 다운로드는 국내에서만 되므로 필요하다. 장애물/노면 XML 을 **내용으로 자동 분류**하고, 노면 `stairs` 는 **StairNet 대조 게이트**로 학습 투입/평가 전용을 가른다 | `--src`(필수) · `--dry-run`(분포만) · `--zip` · `--stairs auto\|train\|eval` |
+| `aihub_pack_for_colab.py` | ★ AIHub 다운로드분 → **Colab 으로 옮길 수 있는** 데이터셋(YOLO 변환 + **640 리사이즈** + zip, 30GB→2~3GB). **AIHub 해외 차단** 때문에 다운로드는 국내에서만 되므로 필요하다. 장애물/노면 XML 을 **내용으로 자동 분류**하고, 노면 `stairs` 는 **StairNet 대조 게이트**로 학습 투입/평가 전용을 가른다. ★ **정찰**(8/5) — 전량에서 "볼라드 N장"이 나왔을 때 **몇 블록(촬영 세션)인지**와 **저조도가 야간인지 그늘인지**를 같이 낸다 | `--src`(필수) · `--dry-run`(분포·정찰만) · `--recon-sample`(0=전수) · `--zip` · `--stairs auto\|train\|eval` |
 | `extract_nightowls.py` | NightOwls zip 선택 해제 (전량 53.5GiB 대신 ~14GiB) | `--run` 없으면 계획만 출력 |
 | `build_detect_dataset.py` | 통합 데이터셋 생성. LoLI(low 이미지+**high 라벨**) + NightOwls + StairNet + AIHub | `--nightowls` · `--aihub` · `--loli-n 0`(train 제외) · `--dst` |
 | `train_detect.py` | YOLO11n 학습 | `--data` · `--name` · `--cache`(**Windows 는 `none` 유지**) |

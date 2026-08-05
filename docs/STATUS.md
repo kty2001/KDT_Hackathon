@@ -1,7 +1,7 @@
 # 밤마실 — 현재 상태 한 장
 
 > **이 파일만 읽고 작업을 시작할 수 있게** 유지한다. 다른 문서는 *필요할 때만* 연다.
-> 갱신: **2026-08-04** · 작업을 끝낼 때마다 이 파일을 먼저 고칠 것.
+> 갱신: **2026-08-05** · 작업을 끝낼 때마다 이 파일을 먼저 고칠 것.
 
 야맹증 저시력자의 야간 보행을 돕는 **실시간 AI 시각보조**(스마트폰 단독).
 `카메라 → ① 눈부심 억제 → ② 저조도 개선 → ③ 위험요소 탐지 → ④ 선택적 강조 → 화면`.
@@ -30,7 +30,7 @@
 |------|--------|-------------|------|
 | ① 눈부심 억제 | `D1`(Drago) 하이라이트 압축 — **②에 흡수 예정** | 광원 코어 250→157 @640×360 | 🗣️ 통합 여부 회의 안건 |
 | ② 저조도 개선 | **고전 CV 확정**(8/1) · **표시 경로 전용**. `D1A1+bf` + **`ts`(플리커)** | 3축 만족 · `+ts` 증분 **+1.5ms** | ⚠️ **속도 게이트 경계** (≈20.4ms@640×360) |
-| ③ 위험요소 탐지 | **YOLO11n 단일 모델** · **입력은 원본** · 클래스 **`0 person` `1 stairs` `2 bollard`**(8/3 확정) | held-out mAP50 **0.684** · recall **0.609** · `stairs` 오탐 **0.2%**(rec34 2장)·0.0%(rec38) | ⚠️ person·stairs 완료 (8/2) · **bollard 데이터 대기** |
+| ③ 위험요소 탐지 | **YOLO11n 단일 모델** · **입력은 원본** · 클래스 **`0 person` `1 stairs` `2 bollard`**(8/3 확정) | held-out mAP50 **0.684** · recall **0.609** · `stairs` 오탐 **0.2%**(rec34 2장)·0.0%(rec38) | ✅ person·stairs 완료 (8/2) · 🟡 **bollard 는 데이터 확보(8/5) → 정찰 후 `C4c` 학습** |
 | ④ 선택적 강조 | 이중 스트로크 비채움 렌더 | 박스당 **0.5ms** | ✅ 구현 · 실기기 검증 대기 |
 | **파이프라인 통합** | `scripts/pipeline_demo.py` | 데스크톱 end-to-end 동작 확인 (8/2) | ✅ 사전 검증 · 앱 이식 대기 |
 | **③ 앱 전달물** | ONNX FP32 · 640 고정 · NMS 제외 | `outputs/export/bammasil_det_c4b_loli0_640.zip` (9.2MB) · PT↔ONNX 일치 확인 | ✅ 공유 가능 (8/3) |
@@ -68,26 +68,30 @@
    없어 **"거리 장면에선 아예 발화하지 않는다"** 를 배제하지 못한다
    (→ [detection.md 8장](detection.md)).
    - ★ **판별 수단이 하나 늘었다 (8/4)** — AIHub 노면 마스킹 `stairs` 는 **1인칭 보행
-     시점**이라 "원거리 계단"을 처음으로 잴 수 있다. 단 **주간 전용**이므로 `C2` 자체
-     촬영을 대체하지 못한다 — 야간은 여전히 `C2` 뿐이다
+     시점**이라 "원거리 계단"을 처음으로 잴 수 있다. **아직 안 받았다**(→ TODO `W5`).
+     ⚠️ 주간 위주로 보이나 이 역시 **샘플 근거**다 — bbox 태스크에서 그 전제가 흔들렸으므로
+     (2장 5) 받으면 `--dry-run` 정찰로 같이 확인한다. 야간 계단은 일단 `C2` 뿐이다
      (→ [detection.md 8-3](detection.md) · [data.md 3-1-2](data.md)).
-5. ✅ **클래스 확정 — `0 person` · `1 stairs` · `2 bollard`** (8/3). 배선 완료
-   (`aihub_to_yolo.py` → `build_detect_dataset.py --aihub`). 🔴 **그러나 학습은 못 한다** —
-   샘플에 bollard 가 **172박스뿐**이다(NightOwls person 은 7,972개였다).
-   **선행: AIHub 부분 다운로드**(`aihubshell` · 이용 신청 필요 · 목록 → [data.md 3-1-3](data.md)).
-   - ⚠️ **볼라드는 640 입력에서 절반이 탐지 하한 아래다** — 640 환산 폭 중앙 **7.8px**,
-     8px 미만이 **50.3%**(YOLO11 최소 stride 8). 낮은 recall 을 예상하고 시작할 것.
-   - ⚠️ AIHub 는 **주간 전용**이라 야간 볼라드 성능은 `C2` 촬영분에 볼라드 장면이
-     있어야만 판정된다. **촬영 코스에 반영할 것.**
-   - ★ **`stairs` 도 AIHub 에서 나온다 (8/4 정정).** 8/3 의 "AIHub 에 계단 없음"은
-     **장애물 태스크 한정** 결론이었다 — **Surface Masking(노면 20종) 태스크에
-     `caution_zone > stairs` 가 있다.** 클래스 추가가 아니라 클래스 1 의 소스 추가라
-     스키마·배선을 안 건드린다. 다운로드 목록 **2번(노면 라벨 전량)** 을 빠뜨리지 말 것.
-     ⚠️ 노면 `stairs` 는 "노면 구역"이라 우리 "계단 전체 1박스" 정의와 범위가 다를 수
-     있다 — StairNet 과 종횡비·면적 대조 후 **학습 투입 / 평가 전용**을 가른다
-     (→ [data.md 3-1-2](data.md)).
-   - 🗣️ **클래스 2 의 범위가 열려 있다** — 2장이 말하는 "전봇대"는 AIHub `pole`
-     (높이 중앙 648px)이고 `bollard`(75px)와 별개다. 현재는 좁은 정의로 구현했다.
+5. 🟡 **`bollard` — 데이터는 들어왔고, 이제 *어떻게 넣느냐*가 문제다** (8/5).
+   클래스 `0 person`·`1 stairs`·`2 bollard` 확정(8/3) · 배선 완료 · **AIHub bbox 전량
+   300GB 다운로드 완료** → "샘플에 172박스뿐" 병목 해소. 그러나 **장수를 그대로 학습에
+   넣으면 안 된다.** 학습 전 4단계와 게이트는 → [TODO `C4c`](TODO.md), 근거는
+   → [data.md 3-1-4](data.md). 요점만:
+   - 🔴 **"AIHub 는 주간 전용"이 검증 중이다.** 근거가 샘플 297장 육안이었는데 전량
+     1/30 에서 **저조도 ~600장**이 보고됐다. `--dry-run` 정찰이 **밝기와 광원을 별개
+     축으로** 재서 가른다 — 어둡기만 한 것(LOL·LoLI 부류, 포화 광원 **0.00%**)은 야간이
+     아니다. 결과에 따라 **`C2` 우선순위가 달라진다.**
+   - ⚠️ **장수 ≠ 장면 수** (연속 프레임) · **전량을 합치면 주간이 90%** 가 되어 `C4`
+     붕괴 조건이 재현된다 · **야간이 실재하면 그 블록을 다 학습에 넣지 말 것**
+     (rec 34 에 볼라드 라벨이 없어 잴 자가 사라진다).
+   - ⚠️ **볼라드는 640 입력에서 절반이 탐지 하한 아래다** — 폭 중앙 **7.8px** · 8px 미만
+     **50.3%**(YOLO11 최소 stride 8). 낮은 recall 을 예상하고, 평가 때 **크기 구간별
+     recall** 을 같이 뽑을 것 — 단일 mAP 로는 "데이터 부족"과 "해상도 한계"가 안 갈린다.
+   - ★ **`stairs` 도 AIHub 에서 나온다** (8/4 정정) — 8/3 의 "계단 없음"은 **장애물 태스크
+     한정**이었고, **Surface Masking(노면 20종)에 `caution_zone > stairs`** 가 있다.
+     클래스 1 의 소스 추가라 배선을 안 건드린다. **아직 안 받았다**(→ TODO `W5`).
+   - 🗣️ **클래스 2 의 범위가 열려 있다** — 2장의 "전봇대"는 AIHub `pole`(높이 중앙 648px)
+     이고 `bollard`(75px)와 별개다. 현재는 좁은 정의 (→ 회의 안건 7).
 
 ---
 
@@ -132,6 +136,14 @@
     절대경로를 넣으면 이번엔 Windows 경로가 박혀 역시 못 쓴다. **`path:` 를 빼면
     ultralytics 가 yaml 파일의 위치를 기준으로 잡아** 어느 머신에서든 동작한다
     (`aihub_pack_for_colab.make_portable`). 로컬 전용 데이터셋은 지금처럼 절대경로여도 된다.
+12. ★ **한국어 Windows 에서 조용히 죽는 것 2개** (8/5 실측). 둘 다 **큰 데이터를 다 훑은
+    뒤**에 터져서 실행이 통째로 날아간다 — 긴 작업 전에 확인할 것.
+    - **콘솔이 cp949 라 `⚠️`·`★` 출력에서 `UnicodeEncodeError`.** 대비는
+      `sys.stdout.reconfigure(errors="replace")` (한글은 그대로, 이모지만 흘린다).
+      `chcp 65001` 을 요구하지 않는 쪽이 낫다 — 팀원이 한 번 돌리는 스크립트다.
+    - **`cv2.imread` 가 비ASCII 경로를 못 연다.** `data/AIHub인도보행영상…` 처럼 한글이
+      섞이면 예외 없이 **전부 `None`** 이 되어 "한 장도 못 읽었다"로 끝난다. 대비는
+      `cv2.imdecode(np.fromfile(path, np.uint8), ...)`. PIL 은 영향 없다.
 
 ---
 
@@ -153,17 +165,19 @@
 
 | 알고 싶은 것 | 문서 | 크기 |
 |---|---|---|
-| **지금 뭘 해야 하나** (순서·병렬성·일정) | [TODO.md](TODO.md) | 24KB |
-| 기획 (배경·구성·일정) · 환경 셋업 | [../README.md](../README.md) | ~20KB |
-| ③ 탐지 — 데이터 구성 · C4/C4b 판정 | [detection.md](detection.md) | 35KB |
-| ② 고전 arm — 지표·순위·속도·A3 시간축 | [lowlight_classical.md](lowlight_classical.md) | ~55KB |
-| 데이터 상세 · 계단 방식 결정 근거 | [data.md](data.md) | ~44KB |
+| **지금 뭘 해야 하나** (순서·병렬성·일정·담당) | [TODO.md](TODO.md) | 20KB |
+| 기획 (배경·구성·일정) · 환경 셋업 | [../README.md](../README.md) | 24KB |
+| ③ 탐지 — 데이터 구성 · `C4`/`C4b` 판정 · 계단 도메인 | [detection.md](detection.md) | 40KB |
+| ② 고전 arm — 지표·순위·속도·A3 시간축 | [lowlight_classical.md](lowlight_classical.md) | 60KB |
+| 데이터 상세 · **AIHub**(3-1) · 계단 방식 근거 | [data.md](data.md) | 56KB |
 | 모바일 런타임·양자화·FPS 병목 | [hardware_inference.md](hardware_inference.md) | 8KB |
-| 스크립트가 뭘 하는지 | [../scripts/README.md](../scripts/README.md) | 4KB |
-| ★ **`stairs` 라벨을 어떻게 치는가** (`C3` 작업자용) | [labeling_stairs.md](labeling_stairs.md) | 7KB |
+| 스크립트가 뭘 하는지 | [../scripts/README.md](../scripts/README.md) | 8KB |
+| ★ **`stairs` 라벨을 어떻게 치는가** (`C3` 작업자용) | [labeling_stairs.md](labeling_stairs.md) | 12KB |
+| ★ **`bollard` 를 어떻게 넣는가** (`C4c` 착수 전 필독) | [data.md 3-1-4](data.md) | — |
 | ★ **계단 탐지가 완료됐는가** (그림으로) | [../notebooks/stairs_night_review.ipynb](../notebooks/stairs_night_review.ipynb) | — |
 | ★ **AIHub 를 받아 학습까지** (Colab · GPU 없는 PC 에서도) | [../notebooks/colab_aihub_train.ipynb](../notebooks/colab_aihub_train.ipynb) | — |
-| 팀 공유 — ③ 훈련 결과 요약 + 회의 안건 | [share_yolo_c4b_20260803.md](share_yolo_c4b_20260803.md) | 6KB |
+| 팀 공유 — ③ 훈련 결과 요약 + 앱팀 인수인계 | [share_yolo_c4b_20260803.md](share_yolo_c4b_20260803.md) | 12KB |
+| 목적 축을 **무엇으로 어떻게 재는가** | [../scripts/metrics.py](../scripts/metrics.py) | — |
 | 종결된 실험·결정 원문 | [archive/](archive/) | — |
 
 > 📌 **큰 문서는 통째로 읽지 말 것.** 각 문서 맨 위 `0. 결론 요약`만 읽고,
@@ -171,20 +185,18 @@
 
 ---
 
-## 6. 최근 완료 (이번 주)
+## 6. 최근 완료 (최근 며칠)
+
+전체 완료 이력은 → [TODO 8장](TODO.md). 여기는 **아직 머릿속에 있어야 하는 것**만 둔다.
 
 | 항목 | 결과 |
 |---|---|
-| **AIHub 취득 경로 확정 — 국내 패키징 + Colab 학습** (8/4) | ★ **해외 차단**(3장 함정 8)으로 Colab 직접 다운로드가 막혀 역할을 나눴다. `scripts/aihub_pack_for_colab.py`(국내: 다운로드분 → YOLO 변환 + **640 리사이즈** + zip · **30GB → 2~3GB**) + `notebooks/colab_aihub_train.ipynb`(Drive zip → 학습 → Drive). **`uv` 환경 무관**(Colab 에서만 `%pip`). 640 축소는 **손실이 아니다** — 학습 입력이 어차피 640 이라 ultralytics 가 같은 크기로 줄인다(실측 장당 ~80KB). 변환은 `aihub_to_yolo.parse_xml`·`nightowls_yolo.CLASS_NAMES` 를 **그대로 재사용**(클래스 id 이중 정의 방지). ★ 판단 지점 2개가 스크립트에 박혀 있다 — **태스크별 1번 zip 정찰** · **노면 `stairs` StairNet 대조 게이트**(학습 투입/평가 전용 자동 판정). 샘플로 end-to-end 검증 완료(person 525·bollard 175 재현) |
-| **AIHub 노면 마스킹 `stairs` 검토 + 8/3 결론 정정** (8/4) | ★ 8/3 의 "AIHub 에 계단 없음"은 **장애물 태스크 한정**이었다 — 샘플의 bbox·polygon 이 **둘 다 29종 장애물 스키마**(polygon 570개도 car/pole/truck…)여서 **Surface Masking(노면 20종) 태스크를 아예 못 봤다.** 거기에 `caution_zone > stairs` 가 있다. **클래스 1 의 소스로 쓸 수 있다**(클래스 추가 아님 · 폴리곤→bbox 는 `C1` 과 같은 변환). ⚠️ 라벨의 뜻이 "노면 구역"이라 우리 "계단 전체 1박스"와 범위가 다를 수 있어 **StairNet 대조가 선행**. 부분 다운로드 목록에 **노면 라벨 전량** 추가 (→ [data.md 3-1-2·3-1-3](data.md)) |
-| **클래스 3종 확정 + AIHub 배선** (8/3) | `0 person` `1 stairs` `2 bollard`. `aihub_to_yolo.py`(CVAT XML→YOLO · **연속 프레임이라 블록 분할**) + `build_detect_dataset.py --aihub`. ★ 실측 판단 2건: **나머지 26종을 버려도 안전**(`pole` 648px vs `bollard` 75px 로 형태가 갈린다) · **AIHub person 은 반드시 라벨**(안 하면 진짜 "사람=배경") |
-| **🗣️ 회의 안건 3·4 처리** (8/3) | `C2` 촬영의 선행 조건 해소. `stairs` 라벨 정의 확정 → [labeling_stairs.md](labeling_stairs.md). ★ 실측으로 드러난 것: **StairNet 은 최소 크기에 답을 못 준다**(높이 32px 미만 **0.0%** · 면적 중앙 47.5%) — 하한을 두면 "계단=배경"을 가르치는 NightOwls `ignore` 함정의 재판이라 **하한 없음 + `ignore`** 로 정했다. 검수 도구 `scripts/label_stats.py` |
-| **③ ONNX 배포 패키지** (8/3) | `export_onnx.py` — onnx + 연동 README + metadata + zip 을 한 번에 굽고 **PT↔ONNX 정합성 검증**(좌표 0.0001px·conf 0 일치)까지 한다. FP32·640 고정·NMS 제외(모바일 NPU 호환). 앱팀 인수인계 문서는 [share 7장](share_yolo_c4b_20260803.md) |
-| **AIHub 인도보행 샘플 실측** (8/3) | 장애물 29종 · ~~계단 없음~~(**8/4 정정** — 위 항목) · **야간 없음** — 일반 장애물 안건의 판단 근거 확보, 추가 시 진행 경로 확정 (→ [data.md 3-1](data.md)). 팀 공유 문서에도 반영 |
-| **`stairs` 야간/주간 분리 실측 + 검증 노트북** (8/2~3) | ★ StairNet 야간 76장 mAP50 **0.993** — **저조도 아닌 도메인이 문제** (→ 2절 4). 하네스 `eval_stairs_night.py` · 그림 [stairs_night_review.ipynb](../notebooks/stairs_night_review.ipynb) |
-| **`C7` ② arm × ③ mAP** (8/2) | ★ **표시/탐지 경로 분리 확정.** 탐지 앞단은 무처리가 1위이고, ②를 붙이면 `stairs` 오탐이 **0.1%→5.7%** 로 복귀. 4-4 의 "재현율 절반" 프리뷰는 **폐기**(실제 영향은 mAP50 −0.01~−0.04) |
-| **파이프라인 데모** (8/2) | `pipeline_demo.py` — rec 38 연속 프레임으로 ②→③→④ end-to-end 동영상 생성. 원본에서 안 보이던 보행자가 ②로 드러나고 ④가 강조되는 것을 확인 |
-| **`C4b` ③ 재학습** (8/2) | NightOwls 를 학습에 투입. held-out recall **0.195→0.61~0.63**, `stairs` 오탐 **7.7%→0~0.2%** (채택 `c4b_loli0` 은 0.609/0.2%). ★ **LoLI 를 빼도 동점** — "LoLI 가 오염원"이 아니라 *실야간 데이터 부재*가 원인이었다 |
-| **`W1` ② A3 시간축** (8/2) | 플리커가 **실재**함을 처음 측정. `+ts` 가 상쇄 ✅(증분 +1.5ms). `+td` 는 `bf` 대체 **실패** ❌ |
-| `C6` ② 해상도×속도 스윕 (8/1) | 720p 통과는 `A1`·`A2` 뿐 |
-| NightOwls 확보 (8/1) | 13,602장 / 13.78 GiB |
+| ★ **정찰 — 저조도 판별 · 촬영 블록 수** (8/5) | `aihub_pack_for_colab.py --dry-run` 이 **①몇 블록인가 ②저조도가 야간인가 그늘인가**를 낸다. ★ **밝기와 광원을 별개 축으로 잰다** — 임계는 보유 데이터로 보정했고(주간 p5 **94.4** / LOL low p95 **31.0** 사이가 비어 절대 임계가 안전), 요점은 **LOL low 의 포화 광원이 0.00%** 라는 것이다. LoLI 와 같은 부류라 "어둡다"와 "야간이다"가 다른 축임이 실측으로 확인됐다. 광원 **연결성분**으로 하늘(큰 덩어리)과 가로등(작은 점 여럿)을 가른다. 3개 분기 전부 검증(샘플 → 주간 98.3%·1블록 · LOL low → 저조도 97.5%·광원없음 · 합성 점광원/하늘). 근거·읽는 법 → [data.md 3-1-4](data.md) |
+| **문서 최적화** (8/5) | `TODO.md` 전면 재작성(현재 상태 반영 · 취소선 누적 제거) · 종결 논의 2건을 `archive/` 로 이관(② 방식 결정 · 폐기된 프리뷰) · `STATUS` 는 한 장으로 되돌림 |
+| **AIHub 취득 경로 확정 — 국내 패키징 + Colab 학습** (8/4) | **해외 차단**(3장 함정 8)으로 Colab 직접 다운로드가 막혀 역할을 나눴다. `aihub_pack_for_colab.py`(국내: YOLO 변환 + **640 리사이즈** + zip · 30GB→2~3GB) + `colab_aihub_train.ipynb`. 640 축소는 **손실이 아니다**(학습 입력이 어차피 640). 변환은 `parse_xml`·`CLASS_NAMES` 를 **재사용**해 클래스 id 이중 정의를 막았다 |
+| **AIHub 노면 마스킹 `stairs` 발견 + 8/3 정정** (8/4) | 8/3 의 "계단 없음"은 **장애물 태스크 한정**이었다 — 샘플의 bbox·polygon 이 둘 다 29종 장애물 스키마라 **Surface Masking 태스크를 아예 못 봤다.** `caution_zone > stairs` 를 **클래스 1 의 소스**로 쓸 수 있다 (→ [data.md 3-1-2](data.md)) |
+| **클래스 3종 확정 + AIHub 배선** (8/3) | `0 person` `1 stairs` `2 bollard`. ★ 실측 판단 2건: **나머지 26종을 버려도 안전**(`pole` 648px vs `bollard` 75px) · **AIHub person 은 반드시 라벨**(안 하면 진짜 "사람=배경") |
+| **③ ONNX 배포 패키지** (8/3) | `export_onnx.py` — onnx + 연동 README + zip 을 한 번에 굽고 **PT↔ONNX 정합성 검증**(좌표 0.0001px 일치)까지. FP32·640 고정·NMS 제외. 인수인계 → [share 7장](share_yolo_c4b_20260803.md) |
+| **`stairs` 야간/주간 분리 실측** (8/2~3) | StairNet 야간 76장 mAP50 **0.993** — **저조도 아닌 도메인이 문제** (→ 2장 4) |
+| **`C7` ② arm × ③ mAP** (8/2) | ★ **표시/탐지 경로 분리 확정.** 탐지 앞단은 무처리가 1위이고, ②를 붙이면 `stairs` 오탐이 **0.1%→5.7%** 로 복귀 |
+| **`C4b` ③ 재학습** (8/2) | held-out recall **0.195→0.609** · `stairs` 오탐 **7.7%→0.2%**. ★ **LoLI 를 빼도 동점** — 원인은 오염이 아니라 *실야간 데이터 부재*였다 |
