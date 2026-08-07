@@ -8,3 +8,10 @@ __pycache__/
 # ultralytics 가 사전학습 가중치를 작업 디렉토리에 받는다 (yolo11n.pt 등).
 # 학습 산출물은 outputs/detect/ 아래에 있으므로 루트의 것은 캐시일 뿐이다.
 *.pt
+
+# 외부 인수분 — 산출물은 outputs/ 와 같은 취급으로 추적하지 않는다.
+# 문서·CSV 만 추적한다. 개수 집계는 error_summary_all.csv 와 각 폴더 README.md 에
+# 전량 들어 있으므로 이미지를 빼도 수치 근거는 보존된다.
+received/bammasil_weights
+received/bammasil_docs/error_analysis/**/*.jpg
+received/*.tar.gz
