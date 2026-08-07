@@ -117,12 +117,27 @@ def parse_args():
                    help="onnxslim 그래프 정리를 건너뛴다")
     p.add_argument("--check-n", type=int, default=8,
                    help="PT↔ONNX 정합성 검증 표본 수. 0 이면 건너뜀")
+    p.add_argument("--val-images", type=Path, default=VAL_IMAGES,
+                   help="정합성 검증 표본 디렉토리. **모델의 학습 도메인과 맞출 것** — "
+                        "도메인이 어긋나면 양쪽 다 검출 0개가 되어 검증이 무의미하게 통과한다")
     p.add_argument("--conf", type=float, default=0.35,
                    help="검증·권장 신뢰도 임계값 (pipeline_demo.py 와 동일)")
     p.add_argument("--iou", type=float, default=0.7, help="NMS IoU 임계값")
     p.add_argument("--no-zip", dest="zip", action="store_false")
     p.add_argument("--seed", type=int, default=0)
     return p.parse_args()
+
+
+def arch_name(model) -> str:
+    """가중치에서 아키텍처를 읽는다.
+
+    하드코딩하면 다른 런을 내보낼 때 **문서가 조용히 거짓말을 한다** — 받는 쪽은
+    metadata.json 을 보고 런타임을 고르므로 (YOLO26 은 NMS-free 라 후처리가 다르다)
+    틀린 이름 하나가 통합 실패로 이어진다.
+    """
+    stem = Path(model.model.yaml.get("yaml_file", "")).stem or "unknown"
+    n = sum(p.numel() for p in model.model.parameters())
+    return f"{stem} (ultralytics · {n / 1e6:.2f}M params)"
 
 
 def sha256(path: Path, chunk: int = 1 << 20) -> str:
@@ -251,11 +266,48 @@ def write_readme(path: Path, meta: dict) -> None:
             f"채택 런이 아닌 가중치를 내보냈다는 뜻이다. 성능을 인용하기 전에 아래로 직접 잴 것:\n\n"
             f"```powershell\n{hd['eval_cmd']}\n```")
 
-    nms_section = (
-        "그래프에 **NMS 가 포함**돼 있다. 출력은 이미 정리된 박스 목록이므로\n"
-        "앱에서 추가 NMS 를 돌리지 말 것.\n"
-        if meta["export"]["nms"] else
-        f"""그래프에 **NMS 가 없다** (의도된 것 — 모바일 NPU 호환).
+    # ★ 출력 계약은 세 가지다. **문서에 하나를 하드코딩하면 반드시 거짓말이 된다.**
+    #   1) --nms         : 그래프에 NMS 를 심은 것
+    #   2) end-to-end    : YOLO26 계열. NMS-free 라 [1, max_det, 6] 으로 **이미 디코딩돼 나온다**
+    #   3) raw           : YOLO11 계열 기본. [1, 4+nc, anchors] 원시 헤드 출력
+    # 2와 3은 앱이 할 일이 정반대다 — 2에 NMS 를 또 돌리면 박스가 사라진다.
+    shape0 = outs[0]["shape"]
+    is_end2end = (not meta["export"]["nms"] and len(shape0) == 3
+                  and shape0[-1] == 6 and shape0[1] != 4 + len(names))
+
+    if meta["export"]["nms"]:
+        nms_section = (
+            "그래프에 **NMS 가 포함**돼 있다. 출력은 이미 정리된 박스 목록이므로\n"
+            "앱에서 추가 NMS 를 돌리지 말 것.\n")
+    elif is_end2end:
+        nms_section = f"""### ⚠️ 이 모델은 **NMS-free (end-to-end)** 다 — YOLO11 계열과 계약이 다르다
+
+`{meta['model']['arch']}` 는 NMS 없이 학습된 구조라, 그래프에 NMS 를 심지 않았는데도
+출력이 **이미 디코딩·정리된 박스 목록**이다.
+
+출력 `{outs[0]['name']}` 은 `{shape0}` 이며 축 구성은
+
+    [batch, max_det={shape0[1]}, 6]
+     └ 채널 0..3 : x1, y1, x2, y2  (letterbox 된 {meta['export']['imgsz']}×{meta['export']['imgsz']} 좌표계, 픽셀 단위)
+     └ 채널 4    : 신뢰도 — **conf 내림차순으로 정렬돼 있다**
+     └ 채널 5    : 클래스 id (float 로 들어온다. 반올림해서 정수로 쓸 것)
+
+`cxcywh` 가 아니라 **`xyxy`** 다. 그리고 `max_det={shape0[1]}` 행은 **항상 채워져 나온다** —
+검출이 적으면 남는 행이 conf 0 으로 패딩된다.
+
+앱에서 할 일 (**3단계뿐이다**):
+1. 채널 4 가 `conf`({meta['inference']['conf']}) 미만인 행을 버린다.
+   정렬돼 있으므로 **처음으로 임계 미만인 행에서 끊으면 된다** — 전수 순회 불필요.
+2. 채널 5 를 반올림해 클래스 id 로 쓴다.
+3. letterbox 역변환 — 패딩 offset 을 빼고 scale 로 나눠 **원본 프레임 좌표**로 되돌린다.
+
+> 🔴 **NMS 를 돌리지 말 것.** 이미 적용돼 있다. 한 번 더 돌리면 겹치는 정탐이 지워진다.
+> YOLO11 계열용 후처리 코드를 그대로 재사용하면 이 사고가 난다 —
+> 두 계열을 같이 비교할 때는 **모델별로 후처리 분기를 둘 것.**
+> 대신 NNAPI 가 `NonMaxSuppression` 을 지원하지 않는 문제에서 자유롭다(그래프 분할 없음).
+"""
+    else:
+        nms_section = f"""그래프에 **NMS 가 없다** (의도된 것 — 모바일 NPU 호환).
 출력 `{outs[0]['name']}` 은 `{outs[0]['shape']}` 이며 축 구성은
 
     [batch, 4 + num_classes, num_anchors]
@@ -268,7 +320,6 @@ def write_readme(path: Path, meta: dict) -> None:
 3. 클래스별 NMS (IoU {meta['inference']['iou']})
 4. letterbox 역변환 — 패딩 offset 을 빼고 scale 로 나눠 **원본 프레임 좌표**로 되돌린다
 """
-    )
 
     path.write_text(f"""# 밤마실 ③ 위험요소 탐지 — ONNX 배포 패키지
 
@@ -285,7 +336,7 @@ def write_readme(path: Path, meta: dict) -> None:
 
 | 항목 | 값 |
 |---|---|
-| 과제 | 야간 보행 위험요소 탐지 (2 클래스) |
+| 과제 | 야간 보행 위험요소 탐지 ({len(names)} 클래스) |
 | 아키텍처 | {meta['model']['arch']} |
 | 입력 | `{inp['name']}` · `{inp['shape']}` · `{inp['dtype']}` |
 | 파라미터 정밀도 | {meta['export']['precision']} |
@@ -377,6 +428,9 @@ uv run python scripts/export_onnx.py {meta['export']['argv_hint']}
 
 def main() -> None:
     args = parse_args()
+    # 상대경로로 넘어오면 뒤의 relative_to(ROOT) 가 터진다. 입구에서 절대경로로 고정한다.
+    args.weights = args.weights.resolve()
+    args.val_images = args.val_images.resolve()
     if not args.weights.is_file():
         raise SystemExit(f"가중치가 없다: {args.weights}")
 
@@ -415,10 +469,10 @@ def main() -> None:
 
     check = None
     if args.check_n > 0:
-        if not VAL_IMAGES.is_dir():
-            print(f"\n⚠️ 검증 표본 없음({VAL_IMAGES}) — 정합성 검증을 건너뛴다")
+        if not args.val_images.is_dir():
+            print(f"\n⚠️ 검증 표본 없음({args.val_images}) — 정합성 검증을 건너뛴다")
         else:
-            pool = sorted(VAL_IMAGES.glob("*.jpg"))
+            pool = sorted(args.val_images.glob("*.jpg"))
             random.Random(args.seed).shuffle(pool)
             sample = pool[:args.check_n]
             print(f"\nPT↔ONNX 정합성 검증 — val 표본 {len(sample)}장 "
@@ -438,8 +492,12 @@ def main() -> None:
         argv_hint += " --dynamic"
     if args.half:
         argv_hint += " --half"
-    if args.weights != WEIGHTS:
+    if args.weights != WEIGHTS.resolve():
         argv_hint += f" --weights {args.weights.relative_to(ROOT).as_posix()}"
+    if args.val_images != VAL_IMAGES.resolve():
+        argv_hint += f" --val-images {args.val_images.relative_to(ROOT).as_posix()}"
+    if args.name:
+        argv_hint += f" --name {args.name}"
 
     meta = {
         "project": "밤마실 (bammasil) — 야간 보행 AI 시각보조",
@@ -447,7 +505,7 @@ def main() -> None:
         "exported_on": date.today().isoformat(),
         "model": {
             "file": onnx_path.name,
-            "arch": "YOLO11n (ultralytics)",
+            "arch": arch_name(model),
             "size_mb": round(onnx_path.stat().st_size / 1e6, 2),
             "sha256": sha256(onnx_path),
             "source_weights": args.weights.relative_to(ROOT).as_posix(),
