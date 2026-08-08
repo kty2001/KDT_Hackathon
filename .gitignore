@@ -15,3 +15,5 @@ __pycache__/
 received/bammasil_weights
 received/bammasil_docs/error_analysis/**/*.jpg
 received/*.tar.gz
+
+*.pdf

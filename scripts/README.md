@@ -36,6 +36,7 @@
 | `probe_classical.py` | 고전 기법 속도 프로브 (arm 이전 단계 탐색) |
 | `compare_lowlight.py` | arm 비교 — 속도·PSNR/SSIM·노이즈 (`--dataset lol\|loli`) |
 | `night_eval.py` | 야간 표본 목적 축 평가 (`--profile-only` 로 밝기·포화 프로파일만) |
+| `darken.py` | 실촬영 소재를 **더 저조도로** 합성 (이미지+동영상). 선형 도메인 노출 감소 + 산탄/리드 노이즈. `--gain`. **정성 확인용** — 합성본이라 정량 근거로 쓰지 말 것 |
 | `resolution_sweep.py` | C6 — **해상도 × arm** 속도 게이트와 목적 축 동시 측정 |
 | `temporal_eval.py` | W1 — A3 시간축. 플리커 증폭률 · 시간축 σ · **고스팅(디테일 유지율)** · 파라미터 스윕 |
 
