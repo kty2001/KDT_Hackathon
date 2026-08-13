@@ -303,6 +303,7 @@ received/README.md              ← 인수인계 진입점. 먼저 읽는다 (10
 | ★ **`bollard` 를 어떻게 넣는가** (`C4c` 착수 전 필독) | [data.md 3-1-4](data.md) | — |
 | ★ **계단 탐지가 완료됐는가** (그림으로) | [../notebooks/stairs_night_review.ipynb](../notebooks/stairs_night_review.ipynb) | — |
 | ★ **AIHub 를 받아 학습까지** (Colab · GPU 없는 PC 에서도) | [../notebooks/colab_aihub_train.ipynb](../notebooks/colab_aihub_train.ipynb) | — |
+| ★ **AIHub 서브셋 라벨을 눈으로 검수** (이미지 위 BBox · 볼라드 크기 · 휘도) | [../notebooks/aihub_subset_review.ipynb](../notebooks/aihub_subset_review.ipynb) | — |
 | ★ **기획서 v20 수치 검증** — 그림 8 · 2.4 KPI · 3.2 · 3.3 (수정 필요 9건) | [review_proposal_v20_20260808.md](review_proposal_v20_20260808.md) | 12KB |
 | 팀 공유 — ③ 훈련 결과 요약 + 앱팀 인수인계 | [share_yolo_c4b_20260803.md](share_yolo_c4b_20260803.md) | 12KB |
 | 목적 축을 **무엇으로 어떻게 재는가** | [../scripts/metrics.py](../scripts/metrics.py) | — |
