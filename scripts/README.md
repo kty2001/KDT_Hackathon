@@ -25,6 +25,7 @@
 | `eval_nightowls.py` | 야간 정직 평가 | `--recordings 34 --drop-unlabeled-person` ← **판정 표준 조합** |
 | `compare_detect.py` | ★ before/after 가중치를 **같은 자로** 일괄 판정 + `stairs` 오탐 | `--runs a,b,c` |
 | `arm_detect_eval.py` | ★ C7 — **② arm 을 앞단에 붙였을 때 ③ 가 좋아지는가**. `표시/탐지 분리` 판정의 근거 | `--arms none D1A1+bf` |
+| `eval_real_night.py` | ★ `C4e` S0b — **자체 실촬영 야간 소재에서 오탐을 센다(라벨 불요)**. 음성 5장은 계단·볼라드가 없고 사람은 7장 전부 0명이라 예측이 곧 오탐이다. **rec34(대시캠)가 못 가르는 FP 축**을 보행 시점에서 잰다 | `--runs` · `--conf 0.25,0.10,0.05` · `--videos` |
 | `eval_stairs_night.py` | `stairs` 를 **야간/주간 갈라서** 평가 (개발 val 은 섞여 있어 야간 성능이 묻힌다) | `--arm D1A1+bf` |
 | `pipeline_demo.py` | ②→③→④ **end-to-end 동영상**. C9 통합 사전검증 + 시연 소재 | `--start` · `--detect-every` · `--fused` |
 | `export_onnx.py` | ★ 가중치 → **ONNX 배포 패키지**(onnx + metadata.json + README + zip). PT↔ONNX 정합성 검증 후 실패 시 종료코드 1 | `--imgsz` · `--opset` · `--nms` · `--check-n` |
