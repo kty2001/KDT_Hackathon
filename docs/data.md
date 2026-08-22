@@ -676,14 +676,15 @@ curl.exe -L -C - --retry 5 --retry-delay 15 --retry-all-errors `
 | `D:\datasets\` | `data/` 아래 기대 경로 | 쓰는 곳 |
 |---|---|---|
 | `NightOwls` | `data/NightOwls` ✅ **연결됨** | `eval_nightowls` · `build_detect_dataset` · `temporal_eval` · `resolution_sweep` |
-| `LoLI-Street` | `data/LoLI-Street` ❌ **미연결** | `build_detect_dataset`(LoLI) · `night_eval` · `compare_lowlight` |
-| `Stair dataset` | `data/Stair dataset` ❌ **미연결** | `stairnet_to_bbox` · `night_eval` |
-| `ExDark` | `data/ExDark` ❌ **미연결** | `night_eval` · `inspect_datasets` |
-| `LOLdataset` | `data/LOLdataset` ❌ **미연결** | `compare_lowlight` · `metrics` · `probe_classical` |
+| `LoLI-Street` | `data/LoLI-Street` ✅ **연결됨** | `build_detect_dataset`(LoLI) · `night_eval` · `compare_lowlight` |
+| `Stair dataset` | `data/Stair dataset` ✅ **연결됨** | `stairnet_to_bbox` · `night_eval` |
+| `ExDark` | `data/ExDark` ✅ **연결됨** | `night_eval` · `inspect_datasets` |
+| `LOLdataset` | `data/LOLdataset` ✅ **연결됨** | `compare_lowlight` · `metrics` · `probe_classical` |
 | `bammasil_aihub_subset` | — (Junction 없음) | `aihub_to_yolo --src` · `aihub_pack_for_colab --src` |
 
-🔴 **미연결이면 스크립트가 "데이터 없음"으로 조용히 끝난다.** 위 경로는 전부
-소스에 하드코딩돼 있으므로, **Junction 을 마저 걸면 코드 변경 0으로 원복**된다.
+✅ **8/23 에 5종 전부 연결했다** (`inspect_datasets.py` 로 4종 읽힘 확인).
+⚠️ **미연결이면 스크립트가 "데이터 없음"으로 조용히 끝난다** — 위 경로는 전부 소스에
+하드코딩돼 있다. 저장소를 새로 받거나 D: 배치가 바뀌면 아래를 다시 돌린다.
 
 ```powershell
 # 팀원 재현용 — 관리자 권한 불요. 저장소 루트에서 실행. 이미 있으면 건너뛴다
