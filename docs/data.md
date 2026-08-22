@@ -2,8 +2,9 @@
 
 > 프로젝트: **밤마실** — 야맹증 저시력자의 야간 보행을 돕는 실시간 AI 시각보조 서비스
 > 파이프라인: ① 눈부심 억제 → ② 저조도 개선 → ③ 위험 요소 탐지 → ④ 선택적 강조
-> 최종 갱신: **2026-08-13** (실촬영 야간 소재 `test_real_data` → 2-2-1)
-> 이전: 8/05 AIHub bbox 전량 확보 + 정찰 → 3-1-4 · 종결 논의 2건 archive 이관
+> 최종 갱신: **2026-08-22** (파생 평가셋이 하드링크가 아니라 복사본이 되는 문제 → 5-2)
+> 이전: 8/13 실촬영 야간 소재 `test_real_data` → 2-2-1 ·
+> 8/05 AIHub bbox 전량 확보 + 정찰 → 3-1-4 · 종결 논의 2건 archive 이관
 > 현재 상태 한 장은 [STATUS.md](STATUS.md) · 작업 순서는 [TODO.md](TODO.md)
 
 ---
@@ -678,6 +679,20 @@ New-Item -ItemType Junction -Path "<저장소>\data\NightOwls" -Target "D:\datas
 
 > `data/` 는 `.gitignore` 대상이라 Junction 자체는 커밋되지 않는다. 팀원은 각자 위 명령으로 연결한다.
 > 기존 4종의 원본 zip 도 `D:\datasets\` 에 보관돼 있어 배치 관행이 일치한다.
+
+> ⚠️ **Junction 이라 파생 평가셋은 하드링크가 안 된다** (8/22 실측). `outputs/datasets/`
+> 로 뽑는 NightOwls 평가셋은 볼륨이 달라 `os.link` 가 실패하고 **PNG 가 통째로 복사**된다
+> (`eval_nightowls.link_or_copy`). 장당 ~1MB 라 해제분 전체 평가셋만으로 **14GB** 였다.
+> 8/22 에 `nightowls_eval`·`nightowls_split/rec38` 을 지워 C: 18.3GB 를 회수했다 —
+> **둘 다 로컬에 없으며** 아래로 재생성한다 (→ STATUS 3장 함정 14).
+>
+> ```powershell
+> uv run python scripts/eval_nightowls.py --dst outputs/datasets/nightowls_eval  # 해제분 전체
+> uv run python scripts/eval_nightowls.py --recordings 38 --fp-only              # rec38
+> ```
+>
+> `outputs/datasets/nightowls_split/rec34_labeled`(held-out 판정용)와
+> `nightowls_jpg`(JPG 변환 캐시)는 **유지한다**.
 
 #### 라벨 실측 — 받기 전에 알아둘 것
 
