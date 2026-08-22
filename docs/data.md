@@ -2,8 +2,8 @@
 
 > 프로젝트: **밤마실** — 야맹증 저시력자의 야간 보행을 돕는 실시간 AI 시각보조 서비스
 > 파이프라인: ① 눈부심 억제 → ② 저조도 개선 → ③ 위험 요소 탐지 → ④ 선택적 강조
-> 최종 갱신: **2026-08-22** (파생 평가셋이 하드링크가 아니라 복사본이 되는 문제 → 5-2)
-> 이전: 8/13 실촬영 야간 소재 `test_real_data` → 2-2-1 ·
+> 최종 갱신: **2026-08-22** (클래스 3종 최종 확정 → 3-1-1 · **데이터 위치 D: 전면 이관** → 5-2)
+> 이전: 8/22 파생 평가셋 복사본 문제 → 5-2 · 8/13 실촬영 야간 소재 `test_real_data` → 2-2-1 ·
 > 8/05 AIHub bbox 전량 확보 + 정찰 → 3-1-4 · 종결 논의 2건 archive 이관
 > 현재 상태 한 장은 [STATUS.md](STATUS.md) · 작업 순서는 [TODO.md](TODO.md)
 
@@ -350,10 +350,18 @@ YOLO11 최소 stride 가 8 이라 **폭 8px 미만(50.3%)은 특징맵 한 칸�
 예상하고 시작할 것.** 그래도 작은 것을 버리지는 않는다(라벨이 있어야 "못 잡는다"를
 측정할 수 있다 → [labeling_stairs.md 3장](labeling_stairs.md)).
 
-🗣️ **열린 항목 — 클래스 2 의 범위**: STATUS 2장은 필요한 것을 "볼라드·**전봇대** 등"
-이라 적었는데 전봇대가 곧 `pole` 이다. 확정 클래스명이 "볼라드"라 기본은 **좁은 정의**
-(bollard 만)로 구현했고, 넓히려면 `aihub_to_yolo.py --pole-as-bollard` 한 번이면 된다.
-제품 정의 문제이므로 회의에서 정한다.
+✅ **클래스 2 의 범위 — 8/22 회의에서 좁은 정의로 확정.** STATUS 2장은 필요한 것을
+"볼라드·**전봇대** 등"이라 적었는데 전봇대가 곧 `pole` 이다. 확정 클래스명이 "볼라드"라
+기본은 **좁은 정의**(bollard 만)로 구현했고, **회의는 그 좁은 정의를 그대로 채택했다** —
+`pole`·`tree_trunk` 는 계속 **배경**이다. `aihub_to_yolo.py --pole-as-bollard` 는
+**향후 확장 대비로 남긴다(기본 off · 켜지 않는다).**
+
+> ★ **귀결** — 인수분 볼라드 FP 의 `ghost` **57~63%** 가 바로 이 **기둥·가로등·표지판
+> 지주**다. 범위를 안 넓혔으므로 **정탐으로 전환되지 않고 영영 오탐**이며, 줄이려면
+> 이들을 **배경 음성 표본으로 더 넣는** 수밖에 없다 (→ [TODO `C4e` S2](TODO.md)).
+
+> 클래스 수를 3종으로 고정한 것도 같은 회의의 결정이다 — **추후 확장 가능성은 열려
+> 있으나 마감(9월 초) 이후 갈래다** (→ [TODO 5장 안건 7](TODO.md)).
 
 ---
 
@@ -658,31 +666,50 @@ curl.exe -L -C - --retry 5 --retry-delay 15 --retry-all-errors `
 | `nightowls_training.json` / `.zip` | 32 MB / **132.50 GiB** | ⏸ 사전학습 착수 시 |
 | `nightowls_test.zip` | 107.68 GiB | ❌ **받지 말 것 — 라벨 없음**(평가서버 제출용 `imageids.json`만 제공) |
 
-#### 📍 데이터 위치
+#### 📍 데이터 위치 — ★ **전 데이터셋이 `D:\datasets\` 에 있다** (8/22 재편)
 
-**실제 저장 경로는 D드라이브다.** C 여유(77 GiB)로는 다운로드+해제를 감당할 수 없다.
+**실제 저장 경로는 D드라이브다.** C 여유로는 다운로드+해제를 감당할 수 없다.
+7/29 에 NightOwls 만 옮겼던 것이 **8/22 에 전 데이터셋으로 확대**됐다.
+저장소 기준 경로는 `data/<이름>` 으로 통일돼 있고 **그것이 Junction 이다** —
+스크립트에 경로 분기가 없다.
 
-```
-D:\datasets\NightOwls\                     ← 실체
-├── nightowls_validation.json              라벨 (10.20 MB)
-└── nightowls_validation.zip               이미지 (53.53 GiB, 받는 중)
+| `D:\datasets\` | `data/` 아래 기대 경로 | 쓰는 곳 |
+|---|---|---|
+| `NightOwls` | `data/NightOwls` ✅ **연결됨** | `eval_nightowls` · `build_detect_dataset` · `temporal_eval` · `resolution_sweep` |
+| `LoLI-Street` | `data/LoLI-Street` ❌ **미연결** | `build_detect_dataset`(LoLI) · `night_eval` · `compare_lowlight` |
+| `Stair dataset` | `data/Stair dataset` ❌ **미연결** | `stairnet_to_bbox` · `night_eval` |
+| `ExDark` | `data/ExDark` ❌ **미연결** | `night_eval` · `inspect_datasets` |
+| `LOLdataset` | `data/LOLdataset` ❌ **미연결** | `compare_lowlight` · `metrics` · `probe_classical` |
+| `bammasil_aihub_subset` | — (Junction 없음) | `aihub_to_yolo --src` · `aihub_pack_for_colab --src` |
 
-C:\Users\USER\Documents\KDT_Hackathon\data\NightOwls   ← Junction (심볼릭 링크)
-```
-
-Junction 을 걸어두어 **저장소 기준 경로는 다른 데이터셋과 동일하게 `data/NightOwls`** 다. 스크립트에서 경로 분기가 필요 없다.
+🔴 **미연결이면 스크립트가 "데이터 없음"으로 조용히 끝난다.** 위 경로는 전부
+소스에 하드코딩돼 있으므로, **Junction 을 마저 걸면 코드 변경 0으로 원복**된다.
 
 ```powershell
-# 팀원 재현용 — 관리자 권한 불요
-New-Item -ItemType Junction -Path "<저장소>\data\NightOwls" -Target "D:\datasets\NightOwls"
+# 팀원 재현용 — 관리자 권한 불요. 저장소 루트에서 실행. 이미 있으면 건너뛴다
+foreach ($n in "NightOwls","LoLI-Street","Stair dataset","ExDark","LOLdataset") {
+    if (-not (Test-Path "data\$n")) {
+        New-Item -ItemType Junction -Path "data\$n" -Target "D:\datasets\$n"
+    }
+}
 ```
 
-> `data/` 는 `.gitignore` 대상이라 Junction 자체는 커밋되지 않는다. 팀원은 각자 위 명령으로 연결한다.
-> 기존 4종의 원본 zip 도 `D:\datasets\` 에 보관돼 있어 배치 관행이 일치한다.
+확인은 한 방이면 된다 — `uv run python scripts/inspect_datasets.py` 가 네 데이터셋
+(LOL · LoLI-Street · StairNet · ExDark)을 한 번에 훑으므로 **Junction 재연결의 회귀
+테스트**로 쓴다.
 
-> ⚠️ **Junction 이라 파생 평가셋은 하드링크가 안 된다** (8/22 실측). `outputs/datasets/`
-> 로 뽑는 NightOwls 평가셋은 볼륨이 달라 `os.link` 가 실패하고 **PNG 가 통째로 복사**된다
-> (`eval_nightowls.link_or_copy`). 장당 ~1MB 라 해제분 전체 평가셋만으로 **14GB** 였다.
+⚠️ **AIHub 만 예외다.** 스크립트가 `--src` 로 받고 폴더 이름도
+`data/AIHub인도보행영상_sample` 과 달라 Junction 을 걸지 않는다 —
+**`D:\datasets\bammasil_aihub_subset` 을 인자로 넘기는 것이 정규 경로**다.
+
+> `data/` 는 `.gitignore` 대상이라 Junction 자체는 커밋되지 않는다. 팀원은 각자 위
+> 명령으로 연결한다. 원본 zip 도 같은 `D:\datasets\` 에 나란히 보관돼 있다.
+> 로컬 메모는 `data/data_info.md` 에도 있으나 **정본은 이 절이다**(그쪽은 git 비추적).
+
+> ⚠️ **원본이 D: 라 파생 평가셋은 하드링크가 안 된다** (8/22 실측). `outputs/` 는 C: 이고
+> 원본은 전부 D: 라 `os.link` 가 볼륨을 넘지 못해 **PNG 가 통째로 복사**된다
+> (`eval_nightowls.link_or_copy` · `eval_stairs_night` 도 같다).
+> 장당 ~1MB 라 해제분 전체 평가셋만으로 **14GB** 였다.
 > 8/22 에 `nightowls_eval`·`nightowls_split/rec38` 을 지워 C: 18.3GB 를 회수했다 —
 > **둘 다 로컬에 없으며** 아래로 재생성한다 (→ STATUS 3장 함정 14).
 >
