@@ -1,7 +1,8 @@
 # 데이터 · 모델 전략
 
 > 프로젝트: **밤마실** — 야맹증 저시력자의 야간 보행을 돕는 실시간 AI 시각보조 서비스
-> 파이프라인: ① 눈부심 억제 → ② 저조도 개선 → ③ 위험 요소 탐지 → ④ 선택적 강조
+> 파이프라인: **표시/탐지 2경로** — 탐지 `원본 → ③` · 표시 `원본 → ①② → ④ → 화면`
+> (①②를 탐지 앞단에 두는 직렬 구조는 8/2 `C7` 로 폐기 → [STATUS 1장](STATUS.md))
 > 최종 갱신: **2026-08-22** (클래스 3종 최종 확정 → 3-1-1 · **데이터 위치 D: 전면 이관** → 5-2)
 > 이전: 8/22 파생 평가셋 복사본 문제 → 5-2 · 8/13 실촬영 야간 소재 `test_real_data` → 2-2-1 ·
 > 8/05 AIHub bbox 전량 확보 + 정찰 → 3-1-4 · 종결 논의 2건 archive 이관
@@ -686,7 +687,7 @@ curl.exe -L -C - --retry 5 --retry-delay 15 --retry-all-errors `
 | `Stair dataset` | `data/Stair dataset` ✅ **연결됨** | `stairnet_to_bbox` · `night_eval` |
 | `ExDark` | `data/ExDark` ✅ **연결됨** | `night_eval` · `inspect_datasets` |
 | `LOLdataset` | `data/LOLdataset` ✅ **연결됨** | `compare_lowlight` · `metrics` · `probe_classical` |
-| `bammasil_aihub_subset` | — (Junction 없음) | `aihub_to_yolo --src` · `aihub_pack_for_colab --src` |
+| `bammasil_aihub_subset` | — (Junction 없음) | ⚠️ **정정(8/23)** — 아래 참조 |
 
 ✅ **8/23 에 5종 전부 연결했다** (`inspect_datasets.py` 로 4종 읽힘 확인).
 ⚠️ **미연결이면 스크립트가 "데이터 없음"으로 조용히 끝난다** — 위 경로는 전부 소스에
@@ -708,6 +709,27 @@ foreach ($n in "NightOwls","LoLI-Street","Stair dataset","ExDark","LOLdataset") 
 ⚠️ **AIHub 만 예외다.** 스크립트가 `--src` 로 받고 폴더 이름도
 `data/AIHub인도보행영상_sample` 과 달라 Junction 을 걸지 않는다 —
 **`D:\datasets\bammasil_aihub_subset` 을 인자로 넘기는 것이 정규 경로**다.
+⚠️ 단 **어느 스크립트에 넘기느냐**가 8/23 에 정정됐다 (바로 아래).
+
+★ **정정 (8/23) — `bammasil_aihub_subset` 은 `aihub_to_yolo.py` 의 입력이 아니다.**
+이 절이 그 서브셋을 `aihub_to_yolo --src` 대상으로 적고 있었으나 **틀렸다.**
+
+- `aihub_to_yolo.py` 는 **CVAT XML 전용**이다 — `:154` 가 `args.src.glob("*.xml")` 로
+  훑고 XML 이 없으면 `SystemExit` 로 끝난다. 서브셋에는 XML 이 **한 개도 없다.**
+- 서브셋은 **이미 YOLO 변환이 끝난 것**이다. 성격상 `aihub_to_yolo.py` 의 **출력물 쪽**에
+  해당한다 (113,163장 · 3클래스 · `.txt` 라벨).
+- 다만 **레이아웃이 다르다** — `build_detect_dataset.AIHUB` 는
+  `{images,labels}/{train,val}` 을 기대하는데(`:235-236`) 서브셋은
+  `<part>/<group>/{images,labels}/` 다. **train/val 분할도 안 돼 있다.**
+- 🔴 그래서 **다리가 하나 빠져 있다.** 현재 `outputs/datasets/aihub_yolo` 에는
+  **옛 샘플 238/58장**만 들어 있어 `--aihub` 를 켜도 전량이 들어가지 않는다.
+  착수 명세는 → [detection.md 11장](detection.md).
+
+| 이름 | 성격 | 형식 | 소비처 |
+|---|---|---|---|
+| `D:\datasets\bammasil_aihub_subset` | AIHub 에서 **추출·변환 완료**한 3클래스 셋 (113,163장) | YOLO `.txt` · `<part>/<group>/{images,labels}` | ✅ **`aihub_subset_to_yolo.py`** (8/23 신설). ⚠️ **그룹 폴더는 세션 경계가 아니다** — 블록의 **59%가 여러 그룹에 걸친다**. 분할 키에 그룹을 넣으면 누수가 "누수 0" 으로 보고된다 (→ [STATUS 3장 함정 17](STATUS.md)) |
+| `outputs/datasets/aihub_yolo` | `aihub_to_yolo.py` 출력 · **현재 옛 샘플 296장뿐** | YOLO `.txt` · `{images,labels}/{train,val}` | `build_detect_dataset.py --aihub` |
+| (원본 CVAT XML) | AIHub 원배포 | XML | `aihub_to_yolo.py --src` · `aihub_pack_for_colab.py --src` |
 
 > `data/` 는 `.gitignore` 대상이라 Junction 자체는 커밋되지 않는다. 팀원은 각자 위
 > 명령으로 연결한다. 원본 zip 도 같은 `D:\datasets\` 에 나란히 보관돼 있다.

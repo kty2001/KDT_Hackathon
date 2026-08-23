@@ -69,10 +69,14 @@ import argparse
 import os
 import random
 import shutil
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from nightowls_yolo import CLASS_NAMES, NightOwlsIndex, write_data_yaml  # noqa: F401
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="replace")         # → STATUS 3장 함정 12
+
+from nightowls_yolo import CLASS_NAMES, NightOwlsIndex, write_data_yaml  # noqa: E402,F401
 
 ROOT = Path(__file__).resolve().parent.parent
 LOLI = ROOT / "data/LoLI-Street/LoLI-Street Dataset"
@@ -114,7 +118,12 @@ def parse_args():
                    help="NightOwls 를 학습에 투입한다 (C4b)")
     p.add_argument("--aihub", action="store_true",
                    help="AIHub 인도보행을 투입한다 — **bollard 의 유일한 소스** (C4c). "
-                        "선행: scripts/aihub_to_yolo.py. ⚠️ 주간 전용")
+                        "선행: scripts/aihub_to_yolo.py(XML) 또는 "
+                        "scripts/aihub_subset_to_yolo.py(이미 YOLO 인 서브셋). ⚠️ 주간 전용")
+    p.add_argument("--aihub-src", type=Path, default=AIHUB,
+                   help="AIHub 변환본 경로 ({images,labels}/{train,val}). "
+                        "🔴 원본이 D: 이면 dst 도 D: 에 둘 것 — 볼륨을 넘으면 하드링크가 "
+                        "안 걸려 통째로 복사된다 (→ STATUS 3장 함정 14)")
     p.add_argument("--no-train-recs", default="36,none,37",
                    help="NightOwls 학습용 recording (쉼표 구분)")
     p.add_argument("--no-val-recs", default="35",
@@ -232,12 +241,13 @@ def add_aihub(out_split: str, args) -> tuple[int, int, int]:
     분할은 aihub_to_yolo.py 가 이미 블록 단위로 나눠 뒀다(연속 프레임 누수 방지).
     여기서 다시 섞지 않는다.
     """
-    src_img = AIHUB / "images" / out_split
-    src_lab = AIHUB / "labels" / out_split
+    src_img = args.aihub_src / "images" / out_split
+    src_lab = args.aihub_src / "labels" / out_split
     if not src_img.is_dir():
         raise SystemExit(
             f"AIHub 변환본이 없다: {src_img}\n"
-            "먼저 실행할 것: uv run python scripts/aihub_to_yolo.py")
+            "먼저 실행할 것: uv run python scripts/aihub_to_yolo.py (CVAT XML 에서) 또는\n"
+            "               uv run python scripts/aihub_subset_to_yolo.py (이미 YOLO 인 서브셋에서)")
 
     out_img = args.dst / "images" / out_split
     out_lab = args.dst / "labels" / out_split

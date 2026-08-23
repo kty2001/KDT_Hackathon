@@ -18,6 +18,7 @@
 |---|---|---|
 | `stairnet_to_bbox.py` | C1 — StairNet 선분 라벨 → YOLO BBox (계단 전체 1박스) | — |
 | `aihub_to_yolo.py` | AIHub 인도보행(CVAT XML) → YOLO. **`bollard` 유일 소스** · 29종 중 3클래스만 담는다 · **연속 프레임이라 블록 분할** | `--pole-as-bollard` · `--val-ratio` |
+| `aihub_subset_to_yolo.py` | ★ `C4e` S2 — **이미 YOLO 인** AIHub 서브셋(`bammasil_aihub_subset`, 113,163장)을 학습 레이아웃으로 옮기는 **다리**. `aihub_to_yolo.py` 는 CVAT XML 전용이라 이걸 못 받는다. **세션 단위 분할**(파일명이 곧 세션 키 · 누수 0 검사) · **서브샘플**(전량은 `C4` 붕괴 재현) · **배경 음성 10%**. 기본값이 `person_night` 를 빼는 이유는 머리말 참고 | `--src` · `--dst`(🔴 원본과 같은 드라이브) · `--max-images` · `--bg-ratio` · `--dry-run` |
 | `aihub_pack_for_colab.py` | ★ AIHub 다운로드분 → **Colab 으로 옮길 수 있는** 데이터셋(YOLO 변환 + **640 리사이즈** + zip, 30GB→2~3GB). **AIHub 해외 차단** 때문에 다운로드는 국내에서만 되므로 필요하다. 장애물/노면 XML 을 **내용으로 자동 분류**하고, 노면 `stairs` 는 **StairNet 대조 게이트**로 학습 투입/평가 전용을 가른다. ★ **정찰**(8/5) — 전량에서 "볼라드 N장"이 나왔을 때 **몇 블록(촬영 세션)인지**와 **저조도가 야간인지 그늘인지**를 같이 낸다 | `--src`(필수) · `--dry-run`(분포·정찰만) · `--recon-sample`(0=전수) · `--zip` · `--stairs auto\|train\|eval` |
 | `extract_nightowls.py` | NightOwls zip 선택 해제 (전량 53.5GiB 대신 ~14GiB) | `--run` 없으면 계획만 출력 |
 | `build_detect_dataset.py` | 통합 데이터셋 생성. LoLI(low 이미지+**high 라벨**) + NightOwls + StairNet + AIHub | `--nightowls` · `--aihub` · `--loli-n 0`(train 제외) · `--dst` |
@@ -26,6 +27,7 @@
 | `compare_detect.py` | ★ before/after 가중치를 **같은 자로** 일괄 판정 + `stairs` 오탐 | `--runs a,b,c` |
 | `arm_detect_eval.py` | ★ C7 — **② arm 을 앞단에 붙였을 때 ③ 가 좋아지는가**. `표시/탐지 분리` 판정의 근거 | `--arms none D1A1+bf` |
 | `eval_real_night.py` | ★ `C4e` S0b — **자체 실촬영 야간 소재에서 오탐을 센다(라벨 불요)**. 음성 5장은 계단·볼라드가 없고 사람은 7장 전부 0명이라 예측이 곧 오탐이다. **rec34(대시캠)가 못 가르는 FP 축**을 보행 시점에서 잰다 | `--runs` · `--conf 0.25,0.10,0.05` · `--videos` |
+| `track_eval.py` | ★ `C4e` S1(E1) — **탐지 프레임 스킵의 대가**를 잰다. 주기 × 보간(none/hold/track) × EMA 를 **오라클(매 프레임 탐지) 대비**로 판정. GT 불요. ⚠️ 트래커는 **순수 파이썬 IoU** — `model.track()` 은 `lap` 이 없어 이 환경에서 못 돌고, 배포 ONNX 는 NMS 도 그래프 밖이라 앱 코드 레벨이 맞다 | `--detect-every 1,2,3` · `--interp none,hold,track` · `--smooth-alpha` · `--videos` |
 | `eval_stairs_night.py` | `stairs` 를 **야간/주간 갈라서** 평가 (개발 val 은 섞여 있어 야간 성능이 묻힌다) | `--arm D1A1+bf` |
 | `pipeline_demo.py` | ②→③→④ **end-to-end 동영상**. C9 통합 사전검증 + 시연 소재 | `--start` · `--detect-every` · `--fused` |
 | `export_onnx.py` | ★ 가중치 → **ONNX 배포 패키지**(onnx + metadata.json + README + zip). PT↔ONNX 정합성 검증 후 실패 시 종료코드 1 | `--imgsz` · `--opset` · `--nms` · `--check-n` |

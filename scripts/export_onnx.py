@@ -84,6 +84,12 @@ RUN_METRICS = {
         "mAP50": 0.691, "mAP50_95": 0.358, "recall": 0.625, "precision": 0.777,
         "stairs_fp_rec34": 0.0, "stairs_fp_rec38": 0.0,
     },
+    # ★ 첫 자체 3클래스 런 (2026-08-23 · C4e S3 → detection.md 11-3c).
+    #   rec38 은 돌리지 않았다(`--skip-fp38`) — **0.0 으로 적지 말 것.** 미측정이다.
+    "c4e_s3_11n": {
+        "mAP50": 0.710, "mAP50_95": 0.354, "recall": 0.635, "precision": 0.787,
+        "stairs_fp_rec34": 0.0, "stairs_fp_rec38": None,
+    },
 }
 HELDOUT_COMMON = {
     "source": "NightOwls recording 34 (held-out, 학습 미사용) · person 클래스",
@@ -258,7 +264,10 @@ def write_readme(path: Path, meta: dict) -> None:
             f"| recall | {m['recall']} |",
             f"| precision | {m['precision']} |",
             f"| `stairs` 야간 오탐률 (rec 34) | {m['stairs_fp_rec34']}% |",
-            f"| `stairs` 야간 오탐률 (rec 38) | {m['stairs_fp_rec38']}% |",
+            # 미측정을 0.0% 로 보이게 하지 않는다 — 안 잰 것과 0 인 것은 다르다
+            "| `stairs` 야간 오탐률 (rec 38) | "
+            + (f"{m['stairs_fp_rec38']}% |" if m.get("stairs_fp_rec38") is not None
+               else "**미측정** |"),
         ])
     else:
         perf_table = (
@@ -492,10 +501,17 @@ def main() -> None:
         argv_hint += " --dynamic"
     if args.half:
         argv_hint += " --half"
+    def _rel(p: Path) -> str:
+        """저장소 밖 경로(파생 데이터셋이 D: 에 있다)면 절대경로 그대로 적는다."""
+        try:
+            return p.relative_to(ROOT).as_posix()
+        except ValueError:
+            return p.as_posix()
+
     if args.weights != WEIGHTS.resolve():
-        argv_hint += f" --weights {args.weights.relative_to(ROOT).as_posix()}"
+        argv_hint += f" --weights {_rel(args.weights)}"
     if args.val_images != VAL_IMAGES.resolve():
-        argv_hint += f" --val-images {args.val_images.relative_to(ROOT).as_posix()}"
+        argv_hint += f" --val-images {_rel(args.val_images)}"
     if args.name:
         argv_hint += f" --name {args.name}"
 
