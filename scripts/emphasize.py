@@ -17,8 +17,15 @@ README 2장의 ④ 정의: *"검출된 위험 요소의 경계선만 대비 색�
     비채움          내부를 칠하거나 반투명 오버레이를 얹으면 잔존시력이 보는 원본
                     정보를 가린다. 경계선 밖은 일절 건드리지 않는다
     색 선택         stairs=노랑(위험 관례색·휘도 최상위), person=시안(노랑과 색상·
-                    휘도 모두 분리). **빨강은 쓰지 않는다** — 휘도가 낮아 야간
-                    배경에 묻히고, 적록색약에서 구분이 무너진다
+                    휘도 모두 분리), bollard=라임(2026-08-24 확정 — 야간 배경 대비가
+                    후보 중 최상위권이고 시안과 확실히 갈린다).
+                    **빨강은 쓰지 않는다** — 휘도가 낮아 야간 배경에 묻히고,
+                    적록색약에서 구분이 무너진다.
+                    ⚠️ **라임의 알려진 절충** — 적록색약에서 `stairs`(노랑)와 가까워진다
+                    (녹색맹 최소 ΔE 9.9 · 적색맹 20.5). 대신 야간 배경 대비를 샀다.
+                    **`P1` 실기기 가독성 검증에서 이 축을 반드시 확인할 것.**
+                    후보를 다시 저울질하려면 `notebooks/emphasis_palette_review.ipynb`
+                    에서 `draw_emphasis(palette=...)` 로 조합을 갈아 끼운다
     깜빡임 금지     대상 사용자가 광과민이다. 점멸·펄스 강조는 금지하고 항상 정적
                     윤곽으로 그린다 (플리커는 안전 이슈 — lowlight_classical.md 3-1)
     두께            프레임 짧은 변에 비례(720p 기준 4px). 저시력 가독을 위해 통상
@@ -49,10 +56,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # 클래스 → 강조색 (BGR). 위 docstring 의 "색 선택" 참고.
 PALETTE: dict[str, tuple[int, int, int]] = {
-    "stairs": (0, 215, 255),  # 노랑
-    "person": (255, 230, 0),  # 시안
+    "stairs": (0, 215, 255),   # 노랑  #FFD700
+    "person": (255, 230, 0),   # 시안  #00E6FF
+    "bollard": (46, 255, 156),  # 라임  #9CFF2E  (2026-08-24 확정)
 }
-FALLBACK_COLOR = (255, 255, 255)  # 미지정 클래스 — 흰색
+FALLBACK_COLOR = (255, 255, 255)  # 미지정 클래스 — 흰색. 세 클래스 중 어느 것도 아닌 값이다
 UNDERLAY_COLOR = (0, 0, 0)
 
 
@@ -84,13 +92,18 @@ def stroke_width(frame: Frame, base: int = 4) -> int:
 
 def draw_emphasis(frame: Frame, detections: Iterable[Detection], *,
                   min_conf: float = 0.35, labels: bool = False,
-                  inplace: bool = False) -> Frame:
+                  inplace: bool = False,
+                  palette: dict[str, tuple[int, int, int]] | None = None) -> Frame:
     """경계선만 이중 스트로크로 그린다. 내부·외부 픽셀은 건드리지 않는다.
 
     min_conf: 렌더 단계의 최종 필터. ③이 이미 걸렀다면 0 으로 두면 된다.
     labels:   클래스명 텍스트. 사용자용 화면에는 끄고(작은 글씨는 저시력에
               무의미) 팀 디버그용으로만 켠다.
+    palette:  클래스 → BGR 색. `None` 이면 모듈 전역 `PALETTE`(= 운영 기본값).
+              `bollard` 색 후보를 비교할 때만 다른 표를 넘긴다 — 렌더 로직을
+              노트북에서 재구현하지 않으려고 연 인자다 (위 "색 선택" 참고).
     """
+    table = PALETTE if palette is None else palette
     out = frame if inplace else frame.copy()
     h, w = out.shape[:2]
     t = stroke_width(out)
@@ -105,7 +118,7 @@ def draw_emphasis(frame: Frame, detections: Iterable[Detection], *,
         y2 = int(np.clip(d.box[3], 0, h - 1))
         if x2 <= x1 or y2 <= y1:
             continue
-        color = PALETTE.get(d.name, FALLBACK_COLOR)
+        color = table.get(d.name, FALLBACK_COLOR)
         cv2.rectangle(out, (x1, y1), (x2, y2), UNDERLAY_COLOR, t + 2 * rim, cv2.LINE_AA)
         cv2.rectangle(out, (x1, y1), (x2, y2), color, t, cv2.LINE_AA)
         if labels:
