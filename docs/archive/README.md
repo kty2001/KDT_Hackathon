@@ -15,6 +15,7 @@
 | [lowlight_lol_notebook_guide.md](lowlight_lol_notebook_guide.md) | LOL 기준 arm 육안 비교 노트북 안내 | 노트북이 신 지표로 재실행됨(8/1) | `notebooks/lowlight_lol_review.ipynb` |
 | [data_decisions_2026-07.md](data_decisions_2026-07.md) | data.md 부록 A — 초기 데이터 결정 이력 | 본문에 흡수 | [data.md](../data.md) |
 | [storage_hold_2026-07-27.md](storage_hold_2026-07-27.md) | 저장공간 부족으로 AI Hub 보류 | D드라이브 확인으로 **해소**(8/1). 이후 300GB 취득(8/5) | [data.md 3-1](../data.md) |
+| [received_c4d_2026-08-07.md](received_c4d_2026-08-07.md) | 외부 인수분 `C4d` 3클래스 6런 비교 원문 (STATUS `★ 외부 인수분` 절) | 8/23 `C4e` S0 로 **채택 판정 완료** · 자체 3클래스 런이 더 나은 것으로 확인 | [STATUS ★인수분 R1~R5](../STATUS.md) · [detection.md 9·11장](../detection.md) |
 | [progress_log_2026-07~08.md](progress_log_2026-07~08.md) | 7~8월 진행 로그 원문 (README 에서 분리) | 요약이 STATUS·TODO 로 이관 | [../STATUS.md](../STATUS.md) |
 
 ## ⚠️ 여기서 배운 것 중 아직 유효한 함정
