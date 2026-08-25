@@ -27,6 +27,7 @@
 | `compare_detect.py` | ★ before/after 가중치를 **같은 자로** 일괄 판정 + `stairs` 오탐 | `--runs a,b,c` |
 | `arm_detect_eval.py` | ★ C7 — **② arm 을 앞단에 붙였을 때 ③ 가 좋아지는가**. `표시/탐지 분리` 판정의 근거 | `--arms none D1A1+bf` |
 | `eval_real_night.py` | ★ `C4e` S0b — **자체 실촬영 야간 소재에서 오탐을 센다(라벨 불요)**. 음성 5장은 계단·볼라드가 없고 사람은 7장 전부 0명이라 예측이 곧 오탐이다. **rec34(대시캠)가 못 가르는 FP 축**을 보행 시점에서 잰다 | `--runs` · `--conf 0.25,0.10,0.05` · `--videos` |
+| `eval_own_night.py` | ★ **`C5` 판정** — 자체 촬영 야간분(**라벨 있음**)에서 후보를 **한 표로** 가른다. 5축 — mAP · 운영점 recall/precision(**+종합**) · 음성 프레임 오탐 · **GT 폭 구간별 recall**(+전체) · **볼라드 박스별 conf**. `ignore` 박스는 감점 제외. ⚠️ 예측을 **한 장씩** 돌린다(방향 섞이면 값이 바뀐다 → 함정 18) · 평가셋은 **복사**로 깐다(링크면 원본이 덮어써진다 → 함정 19) | `--src` · `--runs`\|`--weights` · `--class-conf` · `--device cpu` · `--skip-map` |
 | `track_eval.py` | ★ `C4e` S1(E1) — **탐지 프레임 스킵의 대가**를 잰다. 주기 × 보간(none/hold/track) × EMA 를 **오라클(매 프레임 탐지) 대비**로 판정. GT 불요. ⚠️ 트래커는 **순수 파이썬 IoU** — `model.track()` 은 `lap` 이 없어 이 환경에서 못 돌고, 배포 ONNX 는 NMS 도 그래프 밖이라 앱 코드 레벨이 맞다 | `--detect-every 1,2,3` · `--interp none,hold,track` · `--smooth-alpha` · `--videos` |
 | `eval_stairs_night.py` | `stairs` 를 **야간/주간 갈라서** 평가 (개발 val 은 섞여 있어 야간 성능이 묻힌다) | `--arm D1A1+bf` |
 | `pipeline_demo.py` | ②→③→④ **end-to-end 동영상**. C9 통합 사전검증 + 시연 소재 | `--start` · `--detect-every` · `--fused` |
