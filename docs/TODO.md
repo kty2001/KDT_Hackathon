@@ -224,6 +224,9 @@ c4d 는 50ep/patience 10 이었으므로 **학습량 축이 여기서 처음 확
 - 클래스별 conf(`bollard` 0.15)는 `eval_real_night.py` 함수를 **그대로 재사용**한다 —
   자를 새로 만들지 않았다
 - **2클래스 `c4b_loli0` 은 `bollard` 행이 `-`** 로 나온다(0 이면 "오탐 0" 오독)
+- 🔴 **전처리는 `--letterbox` 가 정한다 — 기본 `square`(배포 ONNX 와 같은 자).**
+  8/23 판정들은 자가 섞여 있었다(→ [STATUS 3장 함정 18](STATUS.md)). 대조하려면
+  `--letterbox rect` 를 같이 뽑을 것
 
 ```powershell
 uv run python scripts/eval_own_night.py --src data/own_night `

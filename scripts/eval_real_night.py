@@ -44,6 +44,22 @@
     라벨이 없으므로 아래 `SCENE` 은 **문서(data.md 2-2-1 · 8/13 육안 확인)에서 온 것**
     이지 파일에서 읽은 것이 아니다. 파일 구성이 바뀌면 즉시 실패하도록 장수를 검사한다.
 
+🔴 레터박스 — `--letterbox` (2026-08-25 추가 · **기본값이 바뀌었다**)
+    ultralytics 는 전처리 모드를 **배치 구성에서** 정한다
+    (`BasePredictor.pre_transform`: `auto = same_shapes and rect`). 그런데 리스트를
+    `source=` 로 주면 `LoadPilAndNumpy.bs = len(리스트)` 라 **리스트 전체가 한 배치**다.
+    즉 **같은 이미지도 옆에 무엇이 들어 있느냐에 따라 예측이 달라진다.**
+
+      · 방향이 전부 같다 → `auto=True`  → **rect**(최소 사각형 · 3060×4080 → 480×640)
+      · 방향이 섞인다     → `auto=False` → **정사각 640×640**
+
+    이 스크립트의 음성 5장은 `_06` 만 가로라 **줄곧 정사각**으로 재고 있었고, 양성
+    장면은 1장씩이라 **rect** 로 재고 있었다 — **한 실행 안에서 자가 두 개였다.**
+    ★ 배포 ONNX 는 **고정 640 정사각**이므로(→ STATUS 3장 함정 10) `square` 가
+    배포와 같은 자다. 그래서 **기본값을 `square` 로 고정**하고, 배치 구성이 아니라
+    플래그가 모드를 정하도록 **한 장씩** 돌린다 (→ STATUS 3장 함정 18).
+    ⚠️ 8/23 의 **양성 장면 confidence** 는 `rect` 기준이다 — 재현하려면 `--letterbox rect`.
+
 사용:
     uv run python scripts/eval_real_night.py
     uv run python scripts/eval_real_night.py --runs c4d_11n_640,c4d_11n_640_noneg
@@ -101,6 +117,13 @@ def parse_args():
                    help="동영상 5개도 같이 센다 (전부 음성 — 계단·볼라드·사람 없음)")
     p.add_argument("--video-stride", type=int, default=30, help="동영상 N 프레임마다 1장")
     p.add_argument("--video-max-frames", type=int, default=20, help="동영상당 상한")
+    p.add_argument("--weights", action="append", type=Path, metavar="PATH",
+                   help="가중치 직접 경로 (여러 번 가능). 주면 --runs 는 무시된다 — "
+                        "학습 레이아웃 밖(인수분 등)을 복사 없이 태울 때")
+    p.add_argument("--letterbox", choices=("square", "rect"), default="square",
+                   help="전처리 — square 는 **배포 ONNX 와 같은 자**(기본). "
+                        "rect 는 ultralytics 기본 동작이자 8/23 양성 수치의 자")
+    p.add_argument("--device", default="0", help="'0' 또는 'cpu'")
     p.add_argument("--out", type=Path, default=DETECT / "c4e_s0b_realnight.json")
     return p.parse_args()
 
@@ -161,16 +184,21 @@ def collect_images(sub: str) -> dict[str, list[Path]]:
     return out
 
 
-def count(model, paths: list[Path], thr: dict[int, float], imgsz: int) -> dict:
+def count(model, paths: list[Path], thr: dict[int, float], args) -> dict:
     """클래스별 박스 수와 최대 confidence. 예측이 없는 클래스는 0 / None.
 
     `thr` 이 전부 같은 값이면 `min()` 이 곧 그 값이라 **예전 스칼라 동작과 동일**하다.
+
+    🔴 **한 장씩 돌린다** — 리스트로 넘기면 방향이 섞였을 때 전처리가 통째로 바뀐다
+    (→ 위 `--letterbox` 절 · STATUS 3장 함정 18).
     """
     box = {PERSON_ID: 0, STAIRS_ID: 0, BOLLARD_ID: 0}
     best = {PERSON_ID: 0.0, STAIRS_ID: 0.0, BOLLARD_ID: 0.0}
     hit_img = 0
-    for r in model.predict(source=[str(p) for p in paths], conf=min(thr.values()),
-                           imgsz=imgsz, device=0, stream=True, verbose=False):
+    for one in paths:
+        r = model.predict(source=str(one), conf=min(thr.values()), imgsz=args.imgsz,
+                          device=args.device, rect=args.letterbox == "rect",
+                          verbose=False)[0]
         if r.boxes is None or not len(r.boxes):
             continue
         cls = r.boxes.cls.tolist()
@@ -199,8 +227,9 @@ def count_videos(model, sub: str, thr: dict[int, float], args) -> dict:
     for v in vids:
         used = 0
         for i, r in enumerate(model.predict(source=str(v), conf=min(thr.values()),
-                                            imgsz=args.imgsz, device=0, stream=True,
-                                            verbose=False)):
+                                            imgsz=args.imgsz, device=args.device,
+                                            rect=args.letterbox == "rect",
+                                            stream=True, verbose=False)):
             if i % args.video_stride:
                 continue
             used += 1
@@ -233,17 +262,29 @@ def main() -> None:
                  for c in args.conf.split(",") if c.strip()]
 
     weights = {}
-    for r in runs:
-        w = DETECT / r / "weights/best.pt"
-        if not w.is_file():
-            raise SystemExit(f"가중치가 없다: {w}")
-        weights[r] = w
+    if args.weights:
+        for w in args.weights:
+            if not w.is_file():
+                raise SystemExit(f"가중치가 없다: {w}")
+            # `<런>/weights/best.pt` 면 런 이름은 두 단계 위, 아니면 그 디렉토리 이름
+            weights[(w.parent.parent.name if w.parent.name == "weights"
+                     else w.parent.name) or w.stem] = w
+    else:
+        for r in runs:
+            w = DETECT / r / "weights/best.pt"
+            if not w.is_file():
+                raise SystemExit(f"가중치가 없다: {w}\n"
+                                 "학습 레이아웃 밖이면 --weights 로 직접 줄 것")
+            weights[r] = w
 
     scenes = {name: collect_images(sub) for name, sub in BRIGHTNESS.items()}
     n_neg = len(next(iter(scenes.values()))["negative"])
     print(f"소재  {SRC}")
     print(f"      음성 {n_neg}장 · `_04` 볼라드 · `_05` 계단 × 밝기 {len(BRIGHTNESS)}단")
     print("      ⚠️ 라벨 없음 — 음성 장면의 예측은 전부 오탐. 사람은 7장 전부 0명이다.")
+    print(f"      전처리 **{args.letterbox}**"
+          + ("  (배포 ONNX 와 같은 자)" if args.letterbox == "square"
+             else "  ⚠️ ultralytics 기본 · 배포와 다르다"))
     if args.class_conf:
         print("★ 클래스별 conf (E2) — 안 적은 클래스는 --base-conf "
               f"{args.base_conf:g}")
@@ -263,9 +304,10 @@ def main() -> None:
                        "conf": min(thr.values()), "conf_label": thr_label(thr),
                        "class_conf": {CLASS_NAMES[c]: thr[c] for c in sorted(thr)},
                        "brightness": bright,
-                       "negative": count(model, s["negative"], thr, args.imgsz),
-                       "bollard_scene": count(model, s["bollard"], thr, args.imgsz),
-                       "stairs_scene": count(model, s["stairs"], thr, args.imgsz)}
+                       "letterbox": args.letterbox,
+                       "negative": count(model, s["negative"], thr, args),
+                       "bollard_scene": count(model, s["bollard"], thr, args),
+                       "stairs_scene": count(model, s["stairs"], thr, args)}
                 if args.videos:
                     rec["video"] = count_videos(model, BRIGHTNESS[bright], thr, args)
                 rows.append(rec)
@@ -313,7 +355,8 @@ def main() -> None:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(
-        {"imgsz": args.imgsz, "n_negative": n_neg, "rows": rows},
+        {"imgsz": args.imgsz, "letterbox": args.letterbox,
+         "n_negative": n_neg, "rows": rows},
         ensure_ascii=False, indent=2), encoding="utf-8")
     # 상대경로로 --out 을 받으면 relative_to 가 터진다 — 표시용이라 실패해도 넘긴다
     try:

@@ -35,9 +35,10 @@
     · 배포 640 고정 전제다. `--imgsz` 를 바꾸면 축 D 의 픽셀 구간이 같이 움직인다.
     · **2클래스 가중치(`c4b_loli0`)는 `bollard` 행이 `-` 로 나온다.** 0 으로 찍으면
       "오탐 0" 으로 오독된다.
-    · 원본은 건드리지 않는다(→ STATUS 3장 함정 7). 평가셋은 `outputs/` 아래에
-      **복사**해서 깐다 — 🔴 하드링크로 깔면 `model.val()` 이 JPEG 을 재인코딩하며
-      **원본을 관통해 덮어쓴다**(8/25 실측 · → 함정 18). 촬영 원본은 다시 못 찍는다.
+    · 원본은 건드리지 않는다(→ STATUS 3장 함정 7). 평가셋은 `outputs/` 아래에 깐다 —
+      `link_or_copy` 가 **원본을 덮어쓰게 될 JPEG 만 복사**한다(→ 함정 19).
+    · **전처리는 `--letterbox` 가 정한다**(기본 `square` = 배포 ONNX 와 같은 자).
+      배치 구성에 따라 조용히 바뀌지 않도록 **한 장씩** 돌린다 (→ 함정 18).
 
 사용:
     uv run python scripts/eval_own_night.py
@@ -68,6 +69,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from nightowls_yolo import CLASS_NAMES, BOLLARD_ID, write_data_yaml  # noqa: E402
+from eval_nightowls import link_or_copy                              # noqa: E402
 from eval_real_night import NAME_TO_ID, parse_class_conf, thr_label  # noqa: E402
 
 SRC_DEFAULT = ROOT / "data/own_night"
@@ -106,6 +108,9 @@ def parse_args():
     p.add_argument("--imgsz", type=int, default=640, help="배포 해상도 고정 전제")
     p.add_argument("--ignore-class-id", type=int, default=3,
                    help="라벨의 ignore 클래스 id (기본 3 — 0/1/2 다음)")
+    p.add_argument("--letterbox", choices=("square", "rect"), default="square",
+                   help="전처리 — square 는 **배포 ONNX 와 같은 자**(기본). "
+                        "rect 는 ultralytics 기본 동작 (→ STATUS 3장 함정 18)")
     p.add_argument("--device", default="0", help="'0' 또는 'cpu'")
     p.add_argument("--skip-map", action="store_true",
                    help="축 A(model.val) 를 건너뛴다 — 배선 확인·CPU 스모크용")
@@ -188,34 +193,25 @@ def load_samples(src: Path, ignore_id: int) -> list[Sample]:
 def build_val(samples: list[Sample], src: Path, dst: Path, rebuild: bool) -> Path:
     """`model.val()` 이 먹을 YOLO 레이아웃을 깐다 — **ignore 를 뺀 라벨**로.
 
-    🔴 **하드링크를 쓰지 않는다 — 반드시 복사한다** (2026-08-25 실측).
-        ultralytics 의 `verify_image` 는 EXIF 회전이 있거나 JPEG 이 조금이라도
-        어긋나면 `"corrupt JPEG restored and saved"` 를 찍고 **그 경로에 다시 쓴다.**
-        하드링크면 그 쓰기가 **원본을 관통한다** — 스모크에서 원본 3.37MB 가
-        7.27MB 로 재인코딩되는 것을 확인했다(inode 동일). `C2` 촬영 원본은 다시
-        못 찍으므로 링크로 이득을 볼 자리가 아니다 (→ STATUS 3장 함정 7·18).
-        `eval_nightowls.py` 가 `link_or_copy` 를 쓰고도 무사한 것은 원본이 `D:`,
-        `outputs/` 가 `C:` 라 **볼륨이 갈려 우연히 복사되기 때문**이다.
-
-    ⚠️ 대가는 용량이다 — `C5` 는 자체 촬영분이라 규모가 작아 감당되지만, 지우고
-       필요할 때 되살리는 산출물로 볼 것 (→ STATUS 3장 함정 14).
+    ⚠️ **원본을 관통해 덮어쓰는 경로가 있다** — ultralytics 는 EOI 마커로 끝나지 않는
+       JPEG 을 스캔 중에 그 경로에 다시 쓰는데, 하드링크면 그 쓰기가 원본에 닿는다
+       (→ STATUS 3장 함정 19 · 실측 3.37MB → 7.27MB). `link_or_copy` 가 **그런 파일만
+       골라 복사**하도록 고쳐 뒀으므로 여기서는 그대로 쓴다.
     """
-    import shutil
     out_img, out_lab = dst / "images/val", dst / "labels/val"
     if out_lab.is_dir() and not rebuild and \
             sum(1 for _ in out_img.glob("*")) == len(samples):
         print(f"  기존 변환본 재사용: {len(samples):,}장 (--rebuild 로 다시 만든다)")
         return dst / "data.yaml"
 
-    total_mb = sum(s.img.stat().st_size for s in samples) / 1024 / 1024
-    print(f"  평가셋을 깐다 — 이미지 {len(samples):,}장 **복사** ({total_mb:,.0f}MB). "
-          "하드링크를 안 쓰는 이유는 build_val docstring 참조 (원본 보호)")
+    print(f"  평가셋을 깐다 — 이미지 {len(samples):,}장 "
+          "(하드링크 · **원본을 덮어쓰게 될 JPEG 은 복사** → 함정 19)")
 
     out_img.mkdir(parents=True, exist_ok=True)
     out_lab.mkdir(parents=True, exist_ok=True)
     n_ign = 0
     for s in samples:
-        shutil.copy2(s.img, out_img / s.img.name)
+        link_or_copy(s.img, out_img / s.img.name)
         (out_lab / f"{s.stem}.txt").write_text(
             "\n".join(s.keep_lines) + ("\n" if s.keep_lines else ""), encoding="utf-8")
         n_ign += len(s.ign)
@@ -565,16 +561,17 @@ def main() -> None:
         # NMS 는 클래스별로 돌고 높은 conf 부터 남기므로 이 둘은 같은 결과다
         # (→ eval_real_night.py 의 --class-conf 와 같은 논리).
         #
-        # 🔴 **한 장씩 넘긴다 — 리스트로 묶으면 안 된다** (2026-08-25 실측).
-        # ultralytics 는 rect 레터박스를 쓰는데, 세로(3060×4080)와 가로(4080×3060)가
-        # 한 predict 호출에 섞이면 공통 입력 shape 로 맞춰지면서 **모든 예측이 바뀐다**
-        # — 같은 볼라드가 conf 0.669 → 0.501 이 됐고 세로 이미지들까지 같이 흔들렸다.
-        # 자체 촬영분은 방향이 섞일 수 있으므로 여기서 반드시 갈라야 한다
-        # (→ STATUS 3장 함정 10 계열).
+        # 🔴 **한 장씩 · `rect` 를 명시해서** 넘긴다 (→ STATUS 3장 함정 18).
+        # ultralytics 는 전처리를 **배치 구성에서** 정한다
+        # (`pre_transform`: `auto = same_shapes and rect`), 그리고 리스트를 주면
+        # `LoadPilAndNumpy.bs = len(리스트)` 라 **리스트 전체가 한 배치**다. 즉 방향이
+        # 섞이는 순간 정사각으로 바뀌며 **모든 예측이 달라진다**(볼라드 0.669 → 0.501).
+        # 자체 촬영분은 방향이 섞일 수 있으므로 배치가 아니라 **플래그**가 정하게 한다.
         cache: dict[str, list] = {}
         for s in samples:
             r = model.predict(source=str(s.img), conf=conf_floor, imgsz=args.imgsz,
-                              device=args.device, verbose=False)[0]
+                              device=args.device, rect=args.letterbox == "rect",
+                              verbose=False)[0]
             box = []
             if r.boxes is not None and len(r.boxes):
                 for c, cf, xyxy in zip(r.boxes.cls.tolist(), r.boxes.conf.tolist(),

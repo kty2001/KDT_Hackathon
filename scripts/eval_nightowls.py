@@ -77,8 +77,30 @@ def parse_args():
     return p.parse_args()
 
 
+def _rewritten_by_ultralytics(src: Path) -> bool:
+    """ultralytics 가 데이터셋 스캔 중에 이 파일을 **덮어쓸 것인가**.
+
+    `data/utils.check_image` 는 JPEG 의 **마지막 2바이트가 EOI(`FFD9`)가 아니면**
+    "corrupt JPEG restored and saved" 를 찍고 `Image.save(im_file, quality=100)` 로
+    **그 경로에 다시 쓴다.** 하드링크면 그 쓰기가 **원본을 관통한다**
+    (→ STATUS 3장 함정 19 · 실측 3.37MB → 7.27MB). 그런 파일만 복사한다 —
+    대부분은 정상이라 하드링크의 이득(AIHub 113,163장)은 그대로 남는다.
+    """
+    if src.suffix.lower() not in (".jpg", ".jpeg"):
+        return False
+    try:
+        with open(src, "rb") as f:
+            f.seek(-2, 2)
+            return f.read() != b"\xff\xd9"
+    except OSError:
+        return True          # 못 읽으면 링크하지 않는다 (안전한 쪽)
+
+
 def link_or_copy(src: Path, dst: Path) -> None:
     if dst.exists():
+        return
+    if _rewritten_by_ultralytics(src):   # → STATUS 3장 함정 19
+        shutil.copy2(src, dst)
         return
     try:
         os.link(src, dst)
