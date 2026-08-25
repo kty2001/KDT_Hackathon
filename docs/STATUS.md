@@ -376,6 +376,7 @@
 | 모바일 런타임·양자화·FPS 병목 · 프레임 스킵 | [hardware_inference.md](hardware_inference.md) | 9KB |
 | 스크립트가 뭘 하는지 | [../scripts/README.md](../scripts/README.md) | 7KB |
 | ★ **`stairs` 라벨을 어떻게 치는가** (`C3` 작업자용) | [labeling_stairs.md](labeling_stairs.md) | 10KB |
+| ★ **외부 리뷰 회신** — 실증 4단 · 계단 오탐 3겹 · **작은 볼라드 & distillation 판단** | [review_response_20260825](review_response_20260825.md) | 17KB |
 | ★ **기획서 v20 수치 검증** — 수정 필요 9건 (미반영) | [review_proposal_v20](review_proposal_v20_20260808.md) | 19KB |
 | 외부 인수분 1차 자료 (회신 요청 10장) | [../received/README.md](../received/README.md) | 15KB |
 | 종결된 실험·결정 원문 — **인수분 `C4d` 원문 포함** | [archive/](archive/) | — |

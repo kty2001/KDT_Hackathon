@@ -395,6 +395,7 @@ uv run python scripts/eval_own_night.py --src data/own_night `
 | **문서 최적화** — `TODO` 전면 재작성 · 종결 논의 2건 `archive/` 이관 · `STATUS` 한 장 복귀 | 8/5 | — |
 | ★ **외부 인수분 `received/` 도착** — `C4d` 3클래스 6런 비교 · `is_night` 무효 판명 | 8/7 | [STATUS ★인수분](STATUS.md) |
 | ★ **기획서 v20 수치 검증** — 수정 필요 5건 + 귀속 오류 1건 | 8/8 | [review_proposal_v20](review_proposal_v20_20260808.md) |
+| ★ **외부 리뷰 회신 작성** — 실증 계획(4단 사다리) · 계단 오탐(원인=데이터 · 3겹) · **작은 볼라드**(`<4px` recall 0.319 · 미탐 58% `blind`) + **distillation 조건부 채택 판단**(선행: `C11` 실기기 계측) | 8/25 | [review_response_20260825](review_response_20260825.md) |
 | ★ **`C5` 판정 하네스 `eval_own_night.py` 신설** — 5축(mAP · 운영점+종합 · 음성 오탐 · 폭 구간별 recall+전체 · 볼라드 박스별 conf) · `ignore` 감점 제외. ★ **기존 하네스 함정 2건 동시 발견**(방향 혼합 배치 · 하드링크 원본 덮어쓰기) | 8/25 | [STATUS 3장 함정 18·19](STATUS.md) |
 | **문서 최적화 2차** — `STATUS` 한 장 복귀(52.5→35KB) · 인수분 원문 `archive/` 이관 · `TODO` 중복 제거 · **`W2` 합성 증강 기각 판정** | 8/25 | [archive/received_c4d](archive/received_c4d_2026-08-07.md) · [detection.md 6-7](detection.md) |
 | ★ **문서 정합 정리** — 폐기된 직렬 파이프라인 표기 4곳 통일 · 재학습이 데이터가 아닌 **배선**으로 막혀 있음을 확인 · 3클래스 전환 함정 3개 기록 | 8/23 | [STATUS 3장 함정 16](STATUS.md) |
