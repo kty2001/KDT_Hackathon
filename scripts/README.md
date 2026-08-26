@@ -32,6 +32,7 @@
 | `eval_stairs_night.py` | `stairs` 를 **야간/주간 갈라서** 평가 (개발 val 은 섞여 있어 야간 성능이 묻힌다) | `--arm D1A1+bf` |
 | `pipeline_demo.py` | ②→③→④ **end-to-end 동영상**. C9 통합 사전검증 + 시연 소재 | `--start` · `--detect-every` · `--fused` |
 | `export_onnx.py` | ★ 가중치 → **ONNX 배포 패키지**(onnx + metadata.json + README + zip). PT↔ONNX 정합성 검증 후 실패 시 종료코드 1 | `--imgsz` · `--opset` · `--nms` · `--check-n` |
+| `quantize_onnx.py` | ★ `C10a` — 배포 ONNX → **양자화 패키지**(onnx + metadata + README + 캘리브 manifest). static PTQ · QDQ · 캘리브는 **야간 실촬영 159프레임**. 🔴 **`Conv` 만 양자화한다** — 전부 하면 머리의 `Concat` 이 박스좌표(0~640)와 점수(0~1)를 한 텐서로 합치는 탓에 **검출이 0 이 된다**(→ 함정 20). `--bits 4` 도 굽히지만 **붕괴해서 기각**됐다 | `--bits 8\|4` · `--preset generic,qnn` · `--block-size` · `--calibrate-method` · `--name` |
 
 ## ② 저조도 실험 하네스
 

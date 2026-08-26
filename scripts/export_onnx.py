@@ -208,7 +208,9 @@ def parity_check(pt_path: Path, onnx_path: Path, images: list[Path],
     import numpy as np
     from ultralytics import YOLO
 
-    pt, ox = YOLO(str(pt_path)), YOLO(str(onnx_path), task="detect")
+    # 양쪽에 task 를 못박는다 — `.pt` 는 어차피 스스로 추론하지만, 이렇게 두면
+    # 같은 함수로 **ONNX ↔ ONNX**(FP32 vs INT8) 도 비교할 수 있다 (quantize_onnx.py).
+    pt, ox = YOLO(str(pt_path), task="detect"), YOLO(str(onnx_path), task="detect")
     n_mismatch, max_xy, max_conf, n_boxes = 0, 0.0, 0.0, 0
 
     for img in images:
