@@ -137,7 +137,18 @@ opset 12 → {result['opset_target']} 변환: {conv_line}
 이 결과는 배포 후보를 만들기 위한 것이 아니다 — `docs/hardware_inference.md`가 이미
 모바일 경로의 정밀도를 NPU(QNN/NNAPI) → INT8, 폰 GPU delegate → FP16으로 정해 두었고
 FP8 실행 경로는 어느 모바일 런타임에도 없다. 이 실험은 그 판단을 실행으로 확인한
-기록이다. 최종 결론은 `docs/STATUS.md` 6장을 본다.
+기록이다.
+
+시도 C(QNN)가 **파일 생성에는 성공**해 "재검토 필요"로 남겼었지만, 그 파일을 실제로
+돌려 보면(위 parity 비교) **A와 같은 이유로 실행이 막힌다** — `float8e4m3fn` 을 받는
+`QLinearConv` 자체가 이 PC의 실행 공급자(CPU/CUDA)에는 없다. QNN(Hexagon NPU) 실기기가
+있어야만 실행 가능 여부를 알 수 있고, 그 실기기가 없는 한 **파일이 만들어졌다는 것과
+동작한다는 것은 다른 이야기**다.
+
+**8비트를 제외한 나머지 압축안은 전부 기각됐다** — `INT4`는 정확도가 붕괴해서
+(야간 볼라드 `_04` 2/2 → 0/2, `outputs/quantization/<pkg>-INT4/<pkg>-INT4_README.md`),
+`FP8`은 이 PC에서 실행 자체가 안 돼서(위) 기각. 배포 후보는 `INT8`
+(`outputs/quantization/<pkg>-INT8/`) 하나뿐이다. 최종 결론은 `docs/STATUS.md` 6장을 본다.
 """, encoding="utf-8")
 
 
@@ -201,19 +212,23 @@ def main() -> int:
 
     # 성공한 시도에 대해서만 FP32 대비 parity 비교 — 함정 20의 "야간 볼라드 2/2 유지" 신호
     images = sorted(CALIB_SRC.glob("*.jpg"))[:8]
+
+    def check_parity(key: str, att: dict, dst: Path) -> None:
+        if not (att["ok"] and images):
+            return
+        print(f"\n[{key}] FP32 대비 parity 비교 ({len(images)}장 · conf 0.25)…")
+        try:
+            cmp_ = parity_check(onnx_path, dst, images, 640, 0.25, 0.7)
+            att["parity_check"] = cmp_
+            print(f"  검출수 불일치 {cmp_['count_mismatch']}/{cmp_['images']}"
+                  f" · 좌표 최대 {cmp_['max_xy_diff_px']}px · conf 최대 {cmp_['max_conf_diff']}"
+                  f" · 통과 {cmp_['passed']}")
+        except Exception as e:
+            att["parity_check"] = {"error": f"{type(e).__name__}: {e}"}
+            print(f"  parity 비교 중 예외: {att['parity_check']['error']}")
+
     for key, dst in (("A_generic_conv_only", dst_a), ("B_generic_full_graph", dst_b)):
-        att = result["attempts"][key]
-        if att["ok"] and images:
-            print(f"\n[{key}] FP32 대비 parity 비교 ({len(images)}장 · conf 0.25)…")
-            try:
-                cmp_ = parity_check(onnx_path, dst, images, 640, 0.25, 0.7)
-                att["parity_check"] = cmp_
-                print(f"  검출수 불일치 {cmp_['count_mismatch']}/{cmp_['images']}"
-                      f" · 좌표 최대 {cmp_['max_xy_diff_px']}px · conf 최대 {cmp_['max_conf_diff']}"
-                      f" · 통과 {cmp_['passed']}")
-            except Exception as e:
-                att["parity_check"] = {"error": f"{type(e).__name__}: {e}"}
-                print(f"  parity 비교 중 예외: {att['parity_check']['error']}")
+        check_parity(key, result["attempts"][key], dst)
 
     # 시도 C — QNN 경로. config 빌드뿐 아니라 실제 quantize() 실행까지 밀어붙인다 —
     # QNN 전용 전처리가 FP8 을 실제로 다루는지는 그 단계에서 드러난다.
@@ -227,6 +242,10 @@ def main() -> int:
     else:
         print(f"  {c['stage']} 단계에서 실패: {c['error']}")
     result["attempts"]["C_qnn_config"] = c
+
+    # config·quantize() 는 그래프를 만들 뿐 실행 가능성은 안 보여준다 — 실제로 돌려서 확인
+    # (2026-08-28 실측: QNN 전용 그래프라 이 PC 의 CPU/CUDA EP 로는 실행 자체가 막힌다).
+    check_parity("C_qnn_config", c, dst_c)
 
     write_result(outdir, result)
     print(f"\n산출  {outdir.relative_to(ROOT)}/")

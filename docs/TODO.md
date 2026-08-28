@@ -207,7 +207,7 @@ uv run python scripts/eval_own_night.py --src data/own_night `
 | **주간→야간** 합성 증강(`W2`) | ✅ **A/B 로 쟀고 값이 없다** — 합성 21,657박스를 넣든 빼든 실야간 동점(`c4b_loli6000` 0.691/0.625 vs `c4b_loli0` 0.684/0.609)인데 **학습 비용은 2배**. 포화 광원 0.00% · 노이즈 방향 역전 · 라벨 오염 (→ [detection.md 6-7](detection.md)) | **없음 — 재개하지 않는다** |
 | `--pole-as-bollard` | 8/22 좁은 정의 확정 | 제품 정의가 바뀔 때 |
 
-### 🆕 C10a. ③ ONNX 양자화 — ✅ **8비트 채택 · 🔴 4비트 기각** (8/26)
+### 🆕 C10a. ③ ONNX 양자화 — ✅ **8비트 채택 · 🔴 4비트·FP8 기각** (8/26 · FP8 8/28)
 
 `C10` 의 준비 작업인데 **선행조건 0**(배포 ONNX 가 로컬에 있고 `.pt` 불요)이라 먼저 돌렸다.
 신설 `scripts/quantize_onnx.py` · 산출은 **`outputs/quantization/<원본이름>-INT{8,4}/`**
@@ -238,6 +238,16 @@ uv run python scripts/quantize_onnx.py --bits 4 --block-size 0    # 4비트 (기
   4비트 initializer 176개로 **기계적으로는 성공**). ORT 의 per-block 스케일은 **rank-2 전용**이라
   Conv(rank-4)는 거부되고(`quant_utils.py:429`) **per-channel 이 상한**인데 거기서 무너졌다.
   `yolo11n` 2.59M 은 깎을 여유가 없다는 뜻이다
+- 🔴 **FP8 은 왜 안 되는가**(`scripts/fp8_quant_experiment.py` · 8/28 · 배포 후보가 아니라
+  기각 판단의 실증용 일회성 실험) — opset 12→19 변환은 성공. 세 경로 전부 막힌다:
+  **A** generic·Conv만: 파일은 만들어지나(3.02MB) 실행 시 `float8e4m3fn` 을 받는
+  `QLinearConv` 자체가 무효(`INVALID_GRAPH`) · **B** generic·전체그래프: 캘리브 단계에서
+  `AttributeError`(분포 캘리브가 float8 에서 `avg`/`std` 를 못 찾음)로 생성 자체가 실패 ·
+  **C** QNN(Hexagon HTP): `get_qnn_qdq_config`→`quantize()` 는 성공하지만(8/26 최초 실측
+  때 "재검토 필요"로 남겼던 것을) 8/28 에 A와 똑같이 실행해 보니 **동일한 `INVALID_GRAPH`**.
+  QNN 전용 그래프라 이 PC(CPU/CUDA 뿐, QNN EP 없음)로는 실행 가능 여부를 확인할 수 없고,
+  실기기(Hexagon NPU) 없이는 "파일이 생겼다"와 "동작한다"가 다른 얘기다. 원문 →
+  `outputs/quantization/<pkg>-FP8_experiment/result.md`
 
 #### 🔴 아직 검증되지 않은 것
 
@@ -253,6 +263,7 @@ uv run python scripts/quantize_onnx.py --bits 4 --block-size 0    # 4비트 (기
 | 항목 | 이유 | 재개 조건 |
 |---|---|---|
 | **4비트 채택** | 🔴 **만들어서 재 봤고 붕괴했다**(↑). ⚠️ 8/26 오전에 "대상 노드 0개라 **불가**"로 적었던 것은 **`matmul_nbits_quantizer`(LLM 전용) 경로만 본 오판**이다 — 일반 QDQ 양자화기는 `QInt4` 를 받고 Conv 88개가 대상이 된다. **생성은 되고 정확도가 무너진다** | **QAT**(학습 PC + `best.pt` 필요) 또는 용량이 더 있는 모델(`11s`)로 갈 때 |
+| **FP8 채택** | 🔴 **세 경로 다 막힌다**(↑) — A·C 는 파일은 생겨도 이 PC 에 `float8e4m3fn` 을 받는 실행 공급자가 없어 `INVALID_GRAPH` · B 는 생성 자체가 캘리브 단계에서 실패. 애초에 `hardware_inference.md`가 정한 모바일 경로(NPU→INT8, GPU delegate→FP16)에 FP8 실행 경로가 없다 | **QNN(Hexagon NPU) 실기기 확보 시** A/C 재검증 가능 — 그 전까지는 재개 안 함 |
 | `quantize_dynamic` | RNN·Transformer 용이다. CNN 은 **static PTQ** 가 정석 | 없음 |
 | 내보내기 단계 FP16(`--half`) | INT8 캘리브의 입력을 **미리 손실**시키고 CPU EP 에서는 오히려 느리다 | GPU delegate 확정 시 |
 | 앱팀 배포 전환 | 🔴 **아직 판정 전** — 위 미검증 4건. 현 계약은 FP32 판 그대로 | `C5` 판정 + `C11` 계측 |
@@ -364,7 +375,7 @@ uv run python scripts/quantize_onnx.py --bits 4 --block-size 0    # 4비트 (기
 
 | 항목 | 완료 | 근거 |
 |------|------|------|
-| ★ **`C10a` ③ ONNX 양자화** — **8비트 채택**(10.61→3.15MB · 볼라드 2/2 유지) · **4비트 기각** · 함정 20 발견 | 8/26 | 3장 `C10a` · 패키지 README |
+| ★ **`C10a` ③ ONNX 양자화** — **8비트 채택**(10.61→3.15MB · 볼라드 2/2 유지) · **4비트·FP8 기각** · 함정 20 발견 | 8/26 · FP8 8/28 | 3장 `C10a` · 패키지 README · FP8 `result.md` |
 | ★ **`C5` 판정 하네스 `eval_own_night.py`** — 5축 · `ignore` 감점 제외. ★ **기존 하네스 함정 2건 동시 발견** | 8/25 | [STATUS 함정 18·19](STATUS.md) |
 | ★ **외부 리뷰 회신** — 실증 4단 · 계단 오탐 3겹 · 작은 볼라드(`<4px` recall **0.319** · 미탐 58% `blind`) + distillation 조건부 판단 | 8/25 | [review_response](review_response_20260825.md) |
 | **문서 최적화 2차** — `STATUS` 52.5→35KB · 인수분 원문 archive 이관 · **`W2` 기각 판정** | 8/25 | [archive/received_c4d](archive/received_c4d_2026-08-07.md) · [detection.md 6-7](detection.md) |
