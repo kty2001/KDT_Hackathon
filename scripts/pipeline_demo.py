@@ -55,7 +55,8 @@ def parse_args():
     p.add_argument("--width", type=int, default=640, help="② 내부 처리 가로")
     p.add_argument("--detect-every", type=int, default=2,
                    help="③ 실행 주기(프레임). 사이 구간은 직전 박스 유지")
-    p.add_argument("--conf", type=float, default=0.35)
+    p.add_argument("--conf", type=float, default=0.25,
+                   help="확정 운영값 0.25 (`C4e` S1 — 일괄 하향은 기각됐다)")
     p.add_argument("--fps", type=float, default=16.0, help="NightOwls 촬영 fps")
     p.add_argument("--layout", choices=["side", "single"], default="side",
                    help="side = 원본 | 처리본 나란히 (차이를 보여주는 용도)")

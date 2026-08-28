@@ -126,8 +126,10 @@ def parse_args():
     p.add_argument("--val-images", type=Path, default=VAL_IMAGES,
                    help="정합성 검증 표본 디렉토리. **모델의 학습 도메인과 맞출 것** — "
                         "도메인이 어긋나면 양쪽 다 검출 0개가 되어 검증이 무의미하게 통과한다")
-    p.add_argument("--conf", type=float, default=0.35,
-                   help="검증·권장 신뢰도 임계값 (pipeline_demo.py 와 동일)")
+    p.add_argument("--conf", type=float, default=0.25,
+                   help="검증·권장 신뢰도 임계값. **0.25 가 확정 운영값**이다 "
+                        "(`C4e` S1 — 일괄 하향 0.10 은 야간 `stairs` 오탐 2~3.7배로 기각). "
+                        "이 값이 패키지 metadata·README 의 권장 임계로 그대로 나간다")
     p.add_argument("--iou", type=float, default=0.7, help="NMS IoU 임계값")
     p.add_argument("--no-zip", dest="zip", action="store_false")
     p.add_argument("--seed", type=int, default=0)

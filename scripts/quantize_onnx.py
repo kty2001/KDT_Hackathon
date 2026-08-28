@@ -83,7 +83,8 @@ if hasattr(sys.stdout, "reconfigure"):
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from export_onnx import letterbox, parity_check      # noqa: E402
+from export_onnx import (WARN_NO_LOWLIGHT, letterbox,    # noqa: E402
+                         parity_check)
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC_ONNX = ROOT / "outputs/export/bammasil_det_c4e_s3_11n_640/bammasil_det_c4e_s3_11n_640.onnx"
@@ -299,13 +300,35 @@ def quantize(preset: str, src13: Path, dst: Path, frames, input_name: str,
 # --------------------------------------------------------------------------- 검증
 
 def graph_io(path: Path) -> dict:
+    """입출력 + 그래프에 박힌 metadata. **파일 자체에서** 뽑는다.
+
+    문서에 손으로 적은 shape·클래스는 옵션을 바꾸는 순간 거짓말이 되므로
+    `export_onnx.graph_io` 와 같은 원칙을 따른다.
+    """
     import onnxruntime as ort
 
     sess = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+    meta = sess.get_modelmeta().custom_metadata_map
     return {"inputs": [{"name": i.name, "shape": i.shape, "dtype": i.type}
                        for i in sess.get_inputs()],
             "outputs": [{"name": o.name, "shape": o.shape, "dtype": o.type}
-                        for o in sess.get_outputs()]}
+                        for o in sess.get_outputs()],
+            "embedded_metadata": {k: meta[k] for k in sorted(meta)}}
+
+
+def classes_of(graph: dict) -> dict[str, str]:
+    """그래프에 박힌 `names` 문자열 → `{"0": "person", ...}`.
+
+    `copy_metadata` 가 원본에서 되박아 둔 값이라 **모델 파일이 정본**이다.
+    비어 있으면 `copy_metadata` 가 실패한 것이므로 빈 dict 를 그대로 낸다 —
+    그래야 검증에서 걸린다.
+    """
+    import ast
+
+    raw = graph.get("embedded_metadata", {}).get("names")
+    if not raw:
+        return {}
+    return {str(k): v for k, v in ast.literal_eval(raw).items()}
 
 
 def bench_cpu(path: Path, imgsz: int, runs: int) -> float | None:
@@ -446,7 +469,7 @@ def write_readme(path: Path, meta: dict) -> None:
 
     path.write_text(f"""# `{src['run_name']}` — INT8 양자화 산출물
 
-> 만든 날 **{meta['created_on']}** · 원본 `{src['file']}` (FP32 · {src['size_mb']} MB)
+> 만든 날 **{meta['exported_on']}** · 원본 `{src['file']}` (FP32 · {src['size_mb']} MB)
 > 🔴 **이것은 배포 확정판이 아니다** — 캘리브 표본이 {meta['calibration']['frames']}프레임
 > (한 장소·한 밤)이고 mAP·recall 정식 판정을 하지 못했다. 아래 5장.
 
@@ -622,23 +645,87 @@ def main() -> int:
                   f"  ({fp32_ms / v['cpu_ms_ref']:.2f}배)")
 
     # 6) 산출물 문서
+    # 주 배포 후보 = generic 판. FP32 패키지의 `model`·`graph`·`parity_check` 자리에 이것이 들어간다.
+    primary = next((v for v in variants if v["preset"] == "generic"), variants[0])
+    prim_path = outdir / primary["file"]
+    src_graph = graph_io(args.onnx)
+    # `run_name` 은 **학습 런** 이름이어야 한다(FP32 패키지와 같은 뜻). 원본 옆의
+    # metadata.json 이 정본이고, 없으면 패키지 디렉토리명으로 물러선다.
+    sibling = args.onnx.parent / "metadata.json"
+    if sibling.is_file():
+        run_name = json.loads(sibling.read_text(encoding="utf-8")).get(
+            "model", {}).get("run_name", run_name)
+
     meta = {
         "project": "밤마실 (bammasil) — 야간 보행 AI 시각보조",
-        "stage": "③ 위험요소 탐지 · INT8 양자화 (C10a)",
-        "created_on": date.today().isoformat(),
+        "stage": f"③ 위험요소 탐지 · INT{args.bits} 양자화 (C10a)",
+        "exported_on": date.today().isoformat(),
         "package": pkg,
         "imgsz": args.imgsz,
         "precision": f"INT{args.bits}",
         "bits": args.bits,
+        # ── 아래 5개는 FP32 배포 패키지와 **같은 키**다. 두 패키지를 한 파서로 읽게 한다.
+        "model": {
+            "file": primary["file"],
+            # description 은 "Ultralytics YOLO11n model trained on <경로>" 형태다.
+            # 아키텍처만 남기고 학습 경로는 자른다 (그 경로는 graph.embedded_metadata 에 있다).
+            "arch": (src_graph["embedded_metadata"].get("description", "")
+                     .split(" trained on")[0].strip()),
+            "size_mb": primary["size_mb"],
+            "sha256": primary["sha256"],
+            "source_onnx": args.onnx.relative_to(ROOT).as_posix(),
+            "source_sha256": sha256(args.onnx),
+            "run_name": run_name,
+        },
+        "classes": classes_of(src_graph),
+        "export": {
+            "imgsz": args.imgsz,
+            "opset": opset_target,
+            "nms": False,
+            "dynamic": False,
+            "precision": f"INT{args.bits}",
+            "bits": args.bits,
+            "quant_format": primary["quant_format"],
+            "per_channel": primary["per_channel"],
+            "activation_type": primary["activation_type"],
+            "weight_type": primary["weight_type"],
+            "op_types_to_quantize": primary["op_types_to_quantize"],
+            "calibrate_method": primary["calibrate_method"],
+            "argv_hint": (f"--bits {args.bits}"
+                          + (f" --block-size {args.block_size}" if args.bits == 4 else "")),
+        },
+        "preprocess": {
+            "resize": "letterbox (종횡비 유지 + 회색 114 패딩)",
+            "color": "RGB",
+            "scale": "0..255 → 0..1 (/255)",
+            "mean_std_normalization": None,
+            "layout": "NCHW float32",
+        },
+        "inference": {"conf": args.conf, "iou": args.iou},
+        "heldout": {
+            "source": "NightOwls recording 34 (held-out, 학습 미사용) · person 클래스",
+            "eval_cmd": "uv run python scripts/eval_nightowls.py --recordings 34 --drop-unlabeled-person",
+            "note": ("🔴 **INT8 판으로는 재측정하지 못했다** — rec34·detect_v3 val 이 이 PC 에 "
+                     "없다. FP32 패키지의 수치를 이 판의 것으로 옮겨 적지 말 것. "
+                     "판정은 학습 PC 또는 C5 하네스(eval_own_night.py)에서 한다."),
+            "metrics": None,
+        },
+        "graph": primary["graph"],
+        "parity_check": {
+            "reference": "FP32 ONNX (배포판) — ⚠️ FP32 패키지의 parity_check 는 PT↔ONNX 라 기준이 다르다",
+            **(primary.get("compare_with_fp32") or {}),
+        },
+        "warning": WARN_NO_LOWLIGHT,
+        # ── 여기부터는 양자화 고유 정보
         "source": {
             "file": args.onnx.name, "run_name": run_name,
-            "path": str(args.onnx.relative_to(ROOT)),
+            "path": args.onnx.relative_to(ROOT).as_posix(),
             "size_mb": mb(args.onnx), "sha256": sha256(args.onnx),
             "graph": graph_io(args.onnx),
         },
         "opset_conversion": {"from": 12, "to": opset_target, **conv},
         "calibration": {
-            "source": str(args.calib_src.relative_to(ROOT)),
+            "source": args.calib_src.relative_to(ROOT).as_posix(),
             "frames": len(frames),
             "video_stride": args.video_stride,
             "include_synthetic": args.include_synthetic,
@@ -653,6 +740,9 @@ def main() -> int:
             "캘리브 표본이 한 장소·한 밤·세로 촬영으로 치우쳐 있다",
             "QNN 판이 실기기에서 CPU fallback 없이 올라가는지 미확인",
             "속도는 실기기(C11)에서만 판정한다 — 위 CPU 배율은 참고치",
+            ("⚠️ inference.conf 가 FP32 패키지와 다르다 — 이 판은 정정된 운영값 0.25 이고 "
+             "FP32 패키지는 아직 0.35 다(생성물이라 best.pt 이관 후 재내보내기가 필요하다). "
+             "모순이 아니라 정정이 반쯤 반영된 상태다"),
         ],
         "environment": {
             "onnxruntime": ort.__version__,
