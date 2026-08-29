@@ -297,6 +297,17 @@
 (지표 근거로 쓰지 말 것). ★ **라벨은 없지만 내용이 값나간다** — `_04` **야간 볼라드 2개**
 (프로젝트 유일) · `_05` 계단 · 나머지 5장은 **오탐을 볼 음성 표본**. **사람은 0장.**
 
+### 4-1. 사용 / 미사용 구분 (탐지 학습·평가 파이프라인 기준)
+
+| 데이터셋 | 상태 | 근거 |
+|---|---|---|
+| NightOwls · LoLI-Street(person) · StairNet(stairs) · AIHub(bollard) | ✅ 학습+평가 결합 | `build_detect_dataset.py` 에 전부 배선됨 |
+| LOL | ⚠️ 벤치마크 전용 | 저조도 **향상(enhancement)** PSNR/SSIM 비교에만 사용, 탐지 학습엔 미사용 (`compare_lowlight.py`) |
+| ExDark | ⚠️ 점검만, 미배선 | `inspect_datasets.py`/`night_eval.py` 에 경로만 있고 `build_detect_dataset.py` 엔 미참조 |
+| LSRW | ❌ 기각(미획득) | Baidu Pan 배포만 존재해 접근 불가 → LoLI-Street 로 대체 (→ [archive/data_decisions_2026-07.md](archive/data_decisions_2026-07.md) A-1) |
+| BDD100K | ❌ 후보 언급만 | [data.md](data.md) §6 에 보조 후보로만 등장, 코드 참조 없음 |
+| COCO | ❌ 데이터셋은 미사용 | `yolo11n.pt` 사전학습 가중치 출처·라벨 인덱스(80-class) 규약으로만 사용 |
+
 ---
 
 ## 5. 문서 지도 — *필요할 때만* 연다
