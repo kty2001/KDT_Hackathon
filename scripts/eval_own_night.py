@@ -552,7 +552,7 @@ def main() -> None:
                           project=str(DETECT), name=f"{run}__c5_own_night",
                           exist_ok=True, plots=False, verbose=False)
             per_run[run]["map"] = {
-                "per_class": {model.names[int(c)]: {"ap50": float(m.box.ap50[i]),
+                "per_class": {CLASS_NAMES[int(c)]: {"ap50": float(m.box.ap50[i]),
                                                     "ap": float(m.box.ap[i])}
                               for i, c in enumerate(m.box.ap_class_index)},
                 "map50": float(m.box.map50), "map": float(m.box.map)}

@@ -2,9 +2,9 @@
 
 > **이 파일만 읽고 작업을 시작할 수 있게** 유지한다. 다른 문서는 *필요할 때만* 연다.
 > 작업을 끝낼 때마다 **이 파일을 먼저** 고칠 것.
-> 갱신 **2026-08-28** — `C4e` **E3 ROI 크롭 기각**(+ 배포 conf 0.35→0.25 절반 정정) ·
-> `C10a` ③ ONNX 양자화(**8비트 채택 · 4비트·FP8 기각**) + **함정 20** ·
-> **문서 compact 3차** — `STATUS` 40→29 · `TODO` 43→30 · `detection` 93→75KB (**−24%**).
+> 갱신 **2026-08-30** — `C5` **1차 판정 실행**(자체 27장·`c4e_s3_11n` 우세) +
+> `eval_own_night.py` 버그 수정 · 이전: 2026-08-28 `C4e` **E3 ROI 크롭 기각**(+ 배포 conf
+> 0.35→0.25 절반 정정) · `C10a` ③ ONNX 양자화(**8비트 채택 · 4비트·FP8 기각**) + **함정 20**.
 
 야맹증 저시력자의 야간 보행을 돕는 **실시간 AI 시각보조**(스마트폰 단독).
 구조는 **표시/탐지 2경로** — 탐지는 **원본**을, 표시는 **①② 처리본**을 쓴다(↓ 1장).
@@ -34,7 +34,7 @@
 |------|--------|-------------|------|
 | ① 눈부심 억제 | `D1`(Drago) — **표시 경로 전용** · ②에 흡수 예정 | 광원 코어 250→157 @640×360 | 🗣️ 통합 여부 회의 안건 |
 | ② 저조도 개선 | **고전 CV 확정**(8/1) · 표시 경로 전용 · `D1A1+bf`+`ts` | 3축 만족 · `+ts` **+1.5ms** | ⚠️ **속도 게이트 경계**(≈20.4ms@640×360) |
-| ③ 위험요소 탐지 | **YOLO11n 단일 모델** · **입력은 원본** · 클래스 `0 person` `1 stairs` `2 bollard`(8/22 최종 확정) | ↓ 후보 표 | 🟡 **후보 3개 · 최종 선택은 `C5`** (→ [detection.md 9장](detection.md)) |
+| ③ 위험요소 탐지 | **YOLO11n 단일 모델** · **입력은 원본** · 클래스 `0 person` `1 stairs` `2 bollard`(8/22 최종 확정) | ↓ 후보 표 | 🟢 **`C5` 1차 완료(8/30)** — `c4e_s3_11n` 우세 · 정식 판정은 `C2` 정규 촬영 대기 (→ [detection.md 9장](detection.md)) |
 | ④ 선택적 강조 | 이중 스트로크 비채움 렌더 · 색 3종 확정(8/24) | 박스당 **0.5ms** · `person` 시안 `#00E6FF` · `stairs` 노랑 `#FFD700` · `bollard` 라임 `#9CFF2E` | ✅ 구현·색 확정 · 🔴 **`P1` 실기기 가독성 대기**(라임↔노랑 적록색약 근접) |
 | **파이프라인 통합** | `scripts/pipeline_demo.py` | 데스크톱 end-to-end 확인(8/2) | ✅ 사전 검증 · 앱 이식 대기 |
 | **③ 앱 전달물** | ONNX FP32 · 640 고정 · NMS 제외 · **INT8 판 동봉**(8/26) | `bammasil_det_c4e_s3_11n_640.zip` 9.20MB · 출력 **[1,7,8400]** · PT↔ONNX **0.0001px** · **INT8 3.15MB**(계약 동일) | 🔴 계약 변경 **앱팀 공지 완료**(8/24 → [share 7-0](share_yolo_c4b_20260803.md)) · 🟡 INT8 은 실기기 확인 전(`C10`) |
@@ -50,6 +50,13 @@
 
 ⚠️ 요약 수치는 **한 런 기준**으로 적을 것 — `c4b_loli6000`(0.691/0.625/0.0%)과 섞으면
 "오탐 0.0%" 같은 과대 표기가 된다 (→ [detection.md 6-7](detection.md)).
+
+### 🟢 `C5` 1차 판정 완료 (8/30)
+
+자체 촬영 27장(`data/own_night`)에서 `c4e_s3_11n`이 mAP·운영점·음성 오탐·볼라드 recall
+전 축 우세(FP32 mAP50 0.551 · INT8도 손실 거의 없음 0.526) — 기존 held-out 판단과 방향이
+같다. `<32px` 표본이 0장이라 **아직 최종 판정은 아니다**. 상세 표·버그 수정·노트북은
+→ [detection.md 9-10](detection.md).
 
 ---
 
@@ -111,12 +118,15 @@
 1. 🔴 **`C2` 자체 야간 촬영** — `C3`→`C5`→`C7b`→`C8`→`C9` 가 전부 직렬로 매달려 있다.
    ✅ **막는 것이 하나도 없다** — 개인정보(8/3) · `stairs` 라벨 정의(→
    [labeling_stairs.md](labeling_stairs.md)) · 클래스 3종 확정(8/22)으로 전제가 전부 풀렸다.
+   - 🟢 **`test_real_data2`(20장·8/30)가 1차분으로 들어왔고 `C5`를 한 번 돌렸다**(→ 1장) —
+     아래 두 항목은 여전히 미해결
    - ⚠️ **멀리서 계단에 접근하는 구간**을 반드시 넣을 것 — 없으면 `stairs` 최대 미검증
      항목(원거리 계단)이 이번에도 측정 불가로 남는다
-   - 🔴 **볼라드 구간 필수** — AIHub 로는 야간 볼라드를 영영 못 잰다(→ R2)
+   - 🔴 **볼라드 구간 필수** — AIHub 로는 야간 볼라드를 영영 못 잰다(→ R2) · 8/30분은
+     근거리 위주라 작은 볼라드 축은 아직 못 잼
    - ⚠️ **인수처도 야간 촬영 대기 중** — 사양·분업을 먼저 정할 것(→ R5)
-   - ✅ **판정 하네스는 준비됐다** — `scripts/eval_own_night.py`(8/25 · 5축 · 기본 `square`).
-     **촬영·라벨만 오면 바로 돌린다** (→ [TODO `C4e` S4](TODO.md))
+   - ✅ **판정 하네스는 준비됐고 8/30 첫 실행에서 버그 1건 고쳤다** —
+     `scripts/eval_own_night.py`(8/25 · 5축 · 기본 `square`).
 2. 🔴 **`P3` 앱 껍데기** — 구현 0건. `C9` 통합 시점에 없으면 통합할 곳이 없다.
 3. ⚠️ **② 속도 게이트** — 720p 를 확실히 통과하는 건 `A1`·`A2`(6ms)뿐인데 **글레어 축
    실격**이다. 채택안 `D1A1+bf+ts` 는 640×360 환산 **≈20.4ms** 로 경계선(판정 불가 밴드
@@ -292,10 +302,9 @@
 
 **NightOwls recording 배치 (고정)**: train `36·none·37` / val `35` / **test `34`** / 제외 `38`
 
-**실촬영 테스트 소재** `data/test_real_data/` — 야간 사진 7 + 동영상 5 (8/8 · 세로 3060×4080).
-`lowlight/`(gain 0.35) · `lowlight_x02/`(gain 0.2)는 `darken.py` 합성본이라 **정성 확인용**
-(지표 근거로 쓰지 말 것). ★ **라벨은 없지만 내용이 값나간다** — `_04` **야간 볼라드 2개**
-(프로젝트 유일) · `_05` 계단 · 나머지 5장은 **오탐을 볼 음성 표본**. **사람은 0장.**
+**실촬영 테스트 소재** `data/test_real_data/`(8/8·7장+동영상5) + `data/test_real_data2/`
+(8/30 신규·20장, `C2`의 1차분 성격 · 사람 표본 최초 포함) — 합쳐 **`data/own_night/`로
+라벨을 채워 `C5`에 썼다**. 장면 구성·정정 내역 상세는 → [data.md 2-2-1](data.md).
 
 ### 4-1. 사용 / 미사용 구분 (탐지 학습·평가 파이프라인 기준)
 
@@ -336,6 +345,7 @@
 | ④ `bollard` 색을 어떻게 골랐나 (색각이상 × 배경 대비) | [emphasis_palette_review](../notebooks/emphasis_palette_review.ipynb) |
 | c4d 라벨 검수 · 640 추론 · **실야간 추론** | [aihub_subset_review](../notebooks/aihub_subset_review.ipynb) |
 | 자체 3클래스 런 `c4e_s3_11n` 추론 | [c4e_infer](../notebooks/c4e_infer.ipynb) |
+| `C5` 후보 4종(FP32 3 + INT8) 지표·예측 비교 | [c5_own_night_review](../notebooks/c5_own_night_review.ipynb) |
 | 계단 탐지가 완료됐는가 | [stairs_night_review](../notebooks/stairs_night_review.ipynb) |
 | AIHub 를 받아 학습까지 (GPU 없는 PC 에서도) | [colab_aihub_train](../notebooks/colab_aihub_train.ipynb) |
 | ② arm 육안 비교 | [lowlight_arms_review](../notebooks/lowlight_arms_review.ipynb) · [lowlight_lol_review](../notebooks/lowlight_lol_review.ipynb) |
@@ -352,6 +362,7 @@
 
 | 항목 | 결과 | 원문 |
 |---|---|---|
+| ★★ **`C5` 1차 실행 — `c4e_s3_11n` 우세 확인 + INT8 포함 비교 노트북** (8/30) | 자체 27장에서 후보 4종(FP32 3 + INT8) 비교, `c4e_s3_11n` 전 축 우세. `eval_own_night.py` 버그 1건 수정 + Windows/Jupyter `model.val()` 함정(`workers=0` 필요) 발견 | [detection.md 9-10](detection.md) · `notebooks/c5_own_night_review.ipynb` |
 | ★ **`C4e` E3 — ROI 크롭 기각** (8/26) | 신설 `scripts/roi_crop_eval.py`(3-arm — **정보 증가 0 인 arm** 을 끼워 스케일 효과와 해상도 효과를 가른다). 단일 창은 전체 recall **−0.18~−0.24** · 2패스는 `<4px` **+0.220** 이나 **FP 2.26배**(정밀도 0.798→0.654). ★★ 그 +0.220 이 **정보 증가 0** 에서 났다 — `<4px` 미탐은 *정보*가 아니라 **스케일** 문제이고, 이는 **용량 축(`11s`·distillation) 근거를 굳힌다**. ★ 리뷰 문서의 "볼라드는 화면 하단에 몰린다" 전제도 **정정**(작은 볼라드는 cy 중앙 0.48). 🟡 **평가셋에 학습분 최대 ~9% — 학습 PC 재확인 대기**(크기별로 갈리는 이득·FP 방향이 오염 가설과 안 맞아 결론은 유지) | [detection.md 9-9-3](detection.md) |
 | 🟡 **배포 conf 계약 정정 — 절반** (8/26) | `export_onnx.py`·`pipeline_demo.py` 기본값 **0.35 → 0.25**(확정 운영값). 🔴 **패키지 `metadata.json`·`README.md` 는 아직 0.35** — 생성물이라 `best.pt` 이관 후 재내보내기 필요 | [TODO §7](TODO.md) |
 | ★★ **`C10a` ③ ONNX 양자화 — 8비트 채택 · 4비트·FP8 기각** (8/26 · FP8 8/28) | **INT8 10.61→3.15MB** · 계약 `[1,7,8400]` 그대로 · 야간 볼라드 **2/2 유지** · 음성 오탐 5→4박스. 🔴 **INT4 는 붕괴**(`qnn` 은 conf 0.01 에서도 0검출 · `generic` 은 볼라드 2/2→0/2 · Conv 는 per-block 스케일 불가라 per-channel 이 상한) · 🔴 **FP8 은 세 경로 다 막힘**(`scripts/fp8_quant_experiment.py` — A·C 는 파일은 생겨도 이 PC(CPU/CUDA, QNN EP 없음)에 `float8e4m3fn` 실행 공급자가 없어 `INVALID_GRAPH` · B 는 캘리브 단계에서 생성 자체가 실패) · 🔴 속도는 이 PC 로 판정 불가(`C11`) | [TODO `C10a`](TODO.md) · 함정 20 · 패키지 README |

@@ -193,9 +193,10 @@ uv run python scripts/eval_own_night.py --src data/own_night `
     --runs c4b_loli0,c4d_11n_640,c4e_s3_11n
 ```
 
-🔴 **남은 것은 소재뿐** — `C2` 촬영 → `C3` 라벨. 들어오는 순간 위 한 줄로 판정된다.
-⚠️ **`C5` 확정 전에 `label_stats.py` 를 한 번 돌릴 것** — 높이 32px 미만 비율이 0 에 가까우면
-라벨이 아니라 **촬영**이 문제다(원거리 계단 미확보 → 재촬영 → [labeling_stairs 7장](labeling_stairs.md)).
+🟢 **1차 실행 완료(8/30)** — `test_real_data`+`test_real_data2` 27장(Claude 육안 라벨)으로
+위 명령을 처음 돌렸다. `c4e_s3_11n` 전 축 우세, 상세는 → [detection.md 9-10](detection.md).
+🔴 **최종 판정은 아니다** — `label_stats.py` 확인 결과 높이 32px 미만 표본이 여전히 0 이라
+`C2` 정식 촬영(원거리 계단 포함) → `C3` 라벨이 그대로 남는 일이다.
 
 #### 하지 않는 것 (재개 조건을 같이 적는다)
 

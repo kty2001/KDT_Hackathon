@@ -1,7 +1,7 @@
 # ③ 위험 요소 탐지 — 데이터 구성 · baseline · 검증
 
 > **밤마실** ③ 단계 (단일 YOLO · 클래스 `0 person` `1 stairs` `2 bollard` — 8/22 최종 확정 ·
-> 그 전 기록은 2종 기준) · 최초 **2026-08-02** · 갱신 **2026-08-26**(문서 compact)
+> 그 전 기록은 2종 기준) · 최초 **2026-08-02** · 갱신 **2026-08-30**(`C5` 1차 판정 추가, 9-10)
 > 👁️ 예측을 눈으로 → [`detect_c4_review`](../notebooks/detect_c4_review.ipynb)(c4b·2클래스) ·
 > [`aihub_subset_review`](../notebooks/aihub_subset_review.ipynb)(c4d·3클래스·실야간) ·
 > [`c4e_infer`](../notebooks/c4e_infer.ipynb)(자체 3클래스)
@@ -51,8 +51,8 @@ mAP50 **0.127 → 0.684**(채택 `c4b_loli0`) · recall **0.195 → 0.609** · `
 - **S2·S3** 배경 음성 1,163장 + NightOwls + AIHub 로 **첫 자체 3클래스 런 `c4e_s3_11n`** →
   게이트 3종 통과(recall **0.635** · `stairs` 오탐 **0.0%**) · 실야간 오탐 **22→9박스** ·
   **야간 볼라드 confidence 붕괴 소멸**(11-3c)
-- 🔴 **최종 채택 판정은 `C5`** — seed 1개 · 실야간 음성 15프레임 · 야간 볼라드 1장이라
-  아직 판정이 아니다
+- 🟢 **`C5` 1차 판정 완료(8/30)** — 자체 촬영 27장에서 `c4e_s3_11n`이 전 축 우세(9-10).
+  `<32px` 표본이 아직 0장이라 **최종 판정은 아니다** — `C2` 정규 촬영 대기
 
 **배포** — ONNX FP32 640(NMS 제외)에 더해 **INT8 판**(10.61→3.15MB · 계약 동일)이 나가 있다.
 4비트는 붕괴로 기각 (→ [TODO `C10a`](TODO.md)).
@@ -1071,6 +1071,49 @@ uv run python scripts/roi_crop_eval.py `
 
 **산출물** `outputs/detect/c4e_roi_crop.json` ·
 재현 `uv run python scripts/roi_crop_eval.py --n 400 --windows "1.0x1.0,0.6x1.0,0.6x0.6" --union 0.6x0.6`
+
+---
+
+## 9-10. `C5` 1차 판정 — 자체 촬영 27장 (2026-08-30)
+
+9-9-3 이 열어 둔 `C5`(보행 시점·라벨 있는 자체 야간분)를 처음 채웠다. `data/test_real_data`
+(7장) + 신규 촬영 `data/test_real_data2`(20장)를 `data/own_night`로 묶고, `person`/`stairs`/
+`bollard` 바운딩박스를 **Claude 가 육안으로 직접 라벨**했다(전용 라벨링 툴 아님 · 근사치 ·
+`docs/labeling_stairs.md` 규칙 적용). GT `person` 4 · `stairs` 6 · `bollard` 13 · `ignore` 14.
+데이터 쪽 상세(장면 구성·`_03.jpg` 재분류)는 → [data.md 2-2-1](data.md).
+
+하네스는 `scripts/eval_own_night.py`(9-9 이전부터 있던 5축 스크립트) 그대로 썼다 — 코드
+변경 없이 라벨만 채워 돌렸다.
+
+| 런 | mAP50(종합) | 운영점(conf .25) recall/prec/F1 | 음성 오탐(27장) | bollard recall |
+|---|---|---|---|---|
+| `c4b_loli0`(2클래스·현 배포) | 0.195 | 0.200 / 0.111 / 0.143 | 13박스 | — |
+| `c4d_11n_640` | 0.531 | 0.609 / 0.467 / 0.528 | 11박스 | 0.692 |
+| **`c4e_s3_11n`**(FP32) | **0.551** | **0.696 / 0.593 / 0.640** | **4박스** | **0.846** |
+| `c4e_s3_11n` **INT8**(`generic`) | 0.526 | 0.696 / 0.571 / 0.627 | 4박스 | 0.846 |
+
+`c4e_s3_11n`이 mAP·운영점·음성 오탐·`bollard` recall 전 축에서 우세 — 기존 held-out(rec34,
+9장 표) 판단과 방향이 같다. **INT8 양자화 손실도 거의 없다**(recall 동일 · mAP50 −0.025 ·
+precision 만 소폭 하락) — `C10a`(→ [TODO](TODO.md)) 채택 결정과 일치.
+
+⚠️ **한계 — `<32px`(작은/원거리) 표본이 이번 27장에 0장이다.** `stairs` recall 은 네 런
+모두 0.167(6개 중 1개)로 낮지만, GT 가 전부 근거리~중거리라 **원거리 계단 문제는 이 표본으로
+여전히 답할 수 없다** — 8장 결론과 동일한 공백이 남아 있다. `C2` 정규 촬영이 필요하다.
+
+🔧 **버그 발견·수정** — `eval_own_night.py`가 2클래스 가중치(`c4b_loli0`)를 3클래스 GT로
+평가할 때 `model.names[int(c)]`에서 `KeyError`로 죽었다. `m.box.ap_class_index`는 **검증
+데이터셋의 클래스 공간**을 가리키지 **모델 자신이 아는 클래스 수**가 아니라서, 2클래스
+모델의 `model.names`엔 없는 인덱스(`bollard`=2)가 나온 것이 원인. `CLASS_NAMES[int(c)]`
+(항상 3개 다 있는 전역 매핑)로 고쳤다 — 이 스크립트가 실제 데이터로 처음 실행되며 드러난
+결함이다.
+
+📓 **재현·시각화** — [`notebooks/c5_own_night_review.ipynb`](../notebooks/c5_own_night_review.ipynb).
+FP32 3종은 `outputs/detect/c5_own_night.json` 캐시를 재사용하고 INT8만 새로 27장을 돌린 뒤,
+대표 5장(볼라드·사람+볼라드+횡단보도·계단·사람 3명·음성)에 4개 후보의 예측 박스를
+`emphasize.draw_emphasis`(배포와 같은 렌더)로 나란히 그린다. Windows + Jupyter 에서
+`model.val()`의 기본 멀티프로세스 데이터로더가 `__main__` 가드 없는 셀에서 spawn 에 실패해
+멈춘 것처럼 보이는 함정을 만났다 — `workers=0`로 해결(노트북에 반영됨).
+
 ---
 
 ## 10. 남은 액션 — **본 문서 범위(③)만**
