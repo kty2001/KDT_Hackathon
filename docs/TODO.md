@@ -360,7 +360,7 @@ uv run python scripts/quantize_onnx.py --bits 4 --block-size 0    # 4비트 (기
 | 🟡 **배포 conf 계약 정정 — 절반 완료**(8/26). ✅ `export_onnx.py`·`pipeline_demo.py` 기본값 **0.35 → 0.25** · ✅ **INT8 패키지는 0.25 로 다시 구웠다**(같은 날 metadata 를 FP32 패키지 키 구조에 맞춰 재작성 — `classes`·`inference`·`preprocess`·`warning` 이 빠져 있었다). 🔴 **남은 것은 FP32 패키지 하나** — `metadata.json`·`README.md` 가 아직 0.35 이고 생성물이라 **`c4e_s3_11n/weights/best.pt` 이관 후** 다시 구워야 한다. 앱팀이 받는 FP32 zip 은 그때까지 0.35 를 말한다 | 팀장 | 💻 |
 | 🔴 **`C2` 야간 촬영지 섭외·장비 준비** — 회의 직후 출발 | 팀원3 | 🎥 |
 | 🔴 **`P3` 앱 껍데기** — 카메라→표시 루프 (처리부 항등함수) | 팀원2 | 📱 |
-| 🆕 🟡 **`C4e` E3 재확인 — 오염 없는 평가셋에서** (8/26 결론의 유일한 구멍). 로컬 AIHub 서브셋은 `c4e_s3_11n` 학습분이 **최대 ~9%** 섞여 있고 **어느 장인지 로컬에서 못 가린다**(`detect_v3` 목록이 학습 PC 에 있다). **train 을 뺀 셋으로 한 번** 돌리면 닫힌다. ⚠️ 같이 **`c4d_11n_640`(외부 학습)로도** 돌릴 것 — 모델을 바꿔도 `<4px` 이득이 재현되면 오염 가설이 배제된다. ⚠️ `roi_crop_eval.py` 의 로더가 서브셋 레이아웃 전용이라 **분기 한 칸** 필요 (→ [detection.md 9-9-3](detection.md)) | 팀장 | 🖥️ |
+| ✅ **`C4e` E3 재확인 — 오염 없는 평가셋에서** (8/26 결론의 유일한 구멍 · **완료 8/31**). `roi_crop_eval.py`에 표준 YOLO 레이아웃 로더 추가 → `detect_v3` val 스플릿(400장 · train 미포함)으로 재실행. `c4e_s3_11n`·`c4d_11n_640` 둘 다 원본과 같은 방향·크기로 재현(union `<4px` Δ +0.193·+0.200 vs 원본 +0.220) — **오염이 결론을 만들지 않았다. E3 기각 최종 확정** (→ [detection.md 9-9-3](detection.md)) | 팀장 | 🖥️ |
 | **`W5`** 노면 마스킹 `Surface_1~5` 다운로드 (`stairs` 원거리 측정용) | 팀원1 | 🖥️국내 |
 | **`C4c` ①정찰** `aihub_pack_for_colab.py --src <해제루트> --dry-run` | 팀원1 | 🖥️국내 |
 | **`P4`** B arm(Zero-DCE/SCI) 구현 · LoLI 라벨 육안 검수 | 팀원1 | 🖥️ |

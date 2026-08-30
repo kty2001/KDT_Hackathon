@@ -731,19 +731,67 @@ foreach ($n in "NightOwls","LoLI-Street","Stair dataset","ExDark","LOLdataset") 
 - 다만 **레이아웃이 다르다** — `build_detect_dataset.AIHUB` 는
   `{images,labels}/{train,val}` 을 기대하는데(`:235-236`) 서브셋은
   `<part>/<group>/{images,labels}/` 다. **train/val 분할도 안 돼 있다.**
-- 🔴 그래서 **다리가 하나 빠져 있다.** 현재 `outputs/datasets/aihub_yolo` 에는
-  **옛 샘플 238/58장**만 들어 있어 `--aihub` 를 켜도 전량이 들어가지 않는다.
-  착수 명세는 → [detection.md 11장](detection.md).
+- ✅ **정정 (8/23) — 다리는 놓였다.** 아래 표의 `outputs/datasets/aihub_yolo`(옛 샘플
+  238/58장 뿐이던 것)는 **더 이상 쓰지 않는다.** `aihub_subset_to_yolo.py` 신설로
+  `D:\datasets\_derived\aihub_yolo_11k`가 그 자리를 대신하고, 실제 학습 데이터셋
+  `detect_v3`까지 이어지는 전체 조합은 → **5-2-1** (바로 아래)에 정리했다.
 
 | 이름 | 성격 | 형식 | 소비처 |
 |---|---|---|---|
 | `D:\datasets\bammasil_aihub_subset` | AIHub 에서 **추출·변환 완료**한 3클래스 셋 (113,163장) | YOLO `.txt` · `<part>/<group>/{images,labels}` | ✅ **`aihub_subset_to_yolo.py`** (8/23 신설). ⚠️ **그룹 폴더는 세션 경계가 아니다** — 블록의 **59%가 여러 그룹에 걸친다**. 분할 키에 그룹을 넣으면 누수가 "누수 0" 으로 보고된다 (→ [STATUS 3장 함정 17](STATUS.md)) |
-| `outputs/datasets/aihub_yolo` | `aihub_to_yolo.py` 출력 · **현재 옛 샘플 296장뿐** | YOLO `.txt` · `{images,labels}/{train,val}` | `build_detect_dataset.py --aihub` |
+| `outputs/datasets/aihub_yolo` | ⚠️ **레거시** — `aihub_to_yolo.py`(CVAT XML 전용) 출력 · 옛 샘플 296장뿐 · 지금 파이프라인은 안 씀 | YOLO `.txt` · `{images,labels}/{train,val}` | (미사용) |
 | (원본 CVAT XML) | AIHub 원배포 | XML | `aihub_to_yolo.py --src` · `aihub_pack_for_colab.py --src` |
 
 > `data/` 는 `.gitignore` 대상이라 Junction 자체는 커밋되지 않는다. 팀원은 각자 위
 > 명령으로 연결한다. 원본 zip 도 같은 `D:\datasets\` 에 나란히 보관돼 있다.
 > 로컬 메모는 `data/data_info.md` 에도 있으나 **정본은 이 절이다**(그쪽은 git 비추적).
+
+#### 5-2-1. ★ 실제 학습 데이터셋 — `_derived/aihub_yolo_11k` → `_derived/detect_v3`
+
+`c4e_s3_11n`(현재 배포 후보 · → [STATUS.md](STATUS.md))이 학습한 데이터셋의 **정본 위치와
+구성**이다. 만드는 논리·설계 근거(왜 이 조합인가)는 → [detection.md 11장](detection.md),
+여기는 **무엇이 어디에 얼마나 있는가**만 다룬다.
+
+**2단계 파이프라인** — 둘 다 `D:\datasets\_derived\`에 있다(→ [STATUS 함정 14](STATUS.md),
+원본이 D: 라 C: 에 두면 하드링크가 안 걸리고 통째로 복사된다).
+
+```
+aihub_subset_to_yolo.py           build_detect_dataset.py
+bammasil_aihub_subset  ────────→  aihub_yolo_11k  ──┐
+(113,163장 · 4그룹)                (11,067장)         ├──→  detect_v3  (train/val 최종본)
+                                   NightOwls ─────────┤     ↑ c4e_s3_11n 이 실제로 학습한 것
+                                   StairNet ──────────┘
+```
+
+| 산출물 | 무엇인가 | 규모 |
+|---|---|---|
+| `_derived\aihub_yolo_11k` | `bammasil_aihub_subset`(113,163장)에서 **볼라드 있는 그룹**(`bollard_night`+`bollard_day`)과 **순수 배경**(`negative_night`)만 골라 **세션 단위로** 11,000장 목표 서브샘플 · `person_night`(21,704장·볼라드 없이 주간 person만 있음)은 통째로 제외 | 11,067장(train 8,802 · val 2,265) · 세션 329 · person 13,746 · bollard 31,779 · 배경 13.0% |
+| `_derived\detect_v3` | 위 `aihub_yolo_11k` + **NightOwls**(recording 36·none·37 train / 35 val · **34·38 은 완전 제외**) + **StairNet 전량** — LoLI-Street 는 **뺐다**(`--loli-n 0`) | train 16,291장 / val 3,781장 · 3클래스 · 배경 train 7.1% |
+
+`detect_v3` train 구성 — NightOwls 4,819장(person 7,972박스 · **실야간**) + AIHub 8,802장
+(person 10,937 · bollard 24,683 · **주간**) + StairNet 2,670장. ⚠️ **person 박스의 실야간
+비중이 42.2%로 내려간다**(NightOwls만 쓰면 100%) — AIHub의 주간 person 라벨은 뺄 수
+없어서다(빼면 "사람=배경"을 가르친다 → [STATUS 함정 4](STATUS.md)). `C4` 붕괴가 정확히
+이 조건이었고, 이걸 게이트(rec34 recall)로 잡는다.
+
+**재현 명령**(세 줄, `D:` 경로 필수):
+
+```powershell
+uv run python scripts/aihub_subset_to_yolo.py `
+    --src "D:\datasets\bammasil_aihub_subset" --dst "D:\datasets\_derived\aihub_yolo_11k" `
+    --max-images 11000 --bg-ratio 0.10
+uv run python scripts/build_detect_dataset.py --nightowls --aihub `
+    --loli-n 0 --dst "D:\datasets\_derived\detect_v3"
+uv run python scripts/train_detect.py --data "D:\datasets\_derived\detect_v3\data.yaml" `
+    --name c4e_s3_11n
+```
+
+`detect_v3\data.yaml`(자동 생성 · 직접 수정 금지)의 `path`는 상대경로 없이 절대경로만
+쓴다 — 이 저장소는 로컬 전용 산출물이라 [함정 11](STATUS.md)의 이식성 문제와 무관하다.
+
+⚠️ `detect_v3\images\val` · `labels\val`은 **정의상 학습에 안 쓰인 held-out**이라, 오염
+없는 재평가가 필요할 때(예: [detection.md 9-9-3](detection.md)의 `C4e` E3 재검증) 이
+val 스플릿을 그대로 쓴다.
 
 > ⚠️ **원본이 D: 라 파생 평가셋은 하드링크가 안 된다** (8/22 실측). `outputs/` 는 C: 이고
 > 원본은 전부 D: 라 `os.link` 가 볼륨을 넘지 못해 **PNG 가 통째로 복사**된다

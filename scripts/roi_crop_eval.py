@@ -141,6 +141,11 @@ def crop_box(w: int, h: int, fw: float, fh: float, cy: float):
 
 # --------------------------------------------------------------------------- 소재
 
+def _has_bollard(txt: Path) -> bool:
+    body = txt.read_text(encoding="utf-8", errors="replace")
+    return f"\n{BOLLARD_ID} " in "\n" + body
+
+
 def load_aihub(src: Path, n: int, seed: int):
     """볼라드 GT 가 있는 이미지를 표본으로 뽑는다 → [(img_path, label_path)]."""
     pairs = []
@@ -159,9 +164,31 @@ def load_aihub(src: Path, n: int, seed: int):
 
     out = []
     for imgs, txt in pairs:
-        body = txt.read_text(encoding="utf-8", errors="replace")
-        if f"\n{BOLLARD_ID} " not in "\n" + body:
+        if not _has_bollard(txt):
             continue                                     # 볼라드 GT 가 없으면 건너뛴다
+        img = next((imgs / (txt.stem + e) for e in (".jpg", ".png", ".jpeg")
+                    if (imgs / (txt.stem + e)).is_file()), None)
+        if img is None:
+            continue
+        out.append((img, txt))
+        if len(out) >= n:
+            break
+    return out
+
+
+def load_yolo_split(src: Path, n: int, seed: int, split: str = "val"):
+    """표준 YOLO 레이아웃(`images/<split>`·`labels/<split>`)에서 볼라드 GT 가 있는 이미지를
+    뽑는다 → [(img_path, label_path)]. `detect_v3` 같은 학습 산출물용 — **val만** 써서
+    학습분 오염을 원천 차단한다(→ STATUS 3장 함정 15 · detection.md 9-9-3 사정거리).
+    """
+    imgs, lab_dir = src / "images" / split, src / "labels" / split
+    pairs = [txt for txt in sorted(lab_dir.glob("*.txt"))]
+    random.Random(seed).shuffle(pairs)
+
+    out = []
+    for txt in pairs:
+        if not _has_bollard(txt):
+            continue
         img = next((imgs / (txt.stem + e) for e in (".jpg", ".png", ".jpeg")
                     if (imgs / (txt.stem + e)).is_file()), None)
         if img is None:
@@ -232,6 +259,7 @@ def fold(rows: dict) -> dict:
 def main() -> int:
     args = parse_args()
     args.onnx = args.onnx.resolve()
+    args.out = args.out.resolve()
     if not args.onnx.is_file():
         raise SystemExit(f"ONNX 가 없다: {args.onnx}")
 
@@ -248,11 +276,17 @@ def main() -> int:
     model = YOLO(str(args.onnx), task="detect")
     thr = {c: args.conf for c in CLASS_NAMES}
 
-    pairs = load_aihub(args.src, args.n, args.seed)
+    is_yolo_split = (args.src / "images" / "val").is_dir() and (args.src / "labels" / "val").is_dir()
+    pairs = (load_yolo_split(args.src, args.n, args.seed) if is_yolo_split
+             else load_aihub(args.src, args.n, args.seed))
     print(f"모델   {args.onnx.relative_to(ROOT)}")
-    print(f"소재   AIHub 볼라드 보유 {len(pairs)}장  (conf {args.conf} · square {args.imgsz})")
+    src_tag = "val 스플릿(오염 차단)" if is_yolo_split else "AIHub 서브셋(⚠️ 학습분 섞임 가능)"
+    print(f"소재   볼라드 보유 {len(pairs)}장 — {src_tag}  (conf {args.conf} · square {args.imgsz})")
     print(f"창     {', '.join(w[0] for w in wins)}  · 세로 중심 {args.window_cy}")
-    print("⚠️ 평가셋 오염 — 이 서브셋으로 학습된 모델이다. **델타로만** 읽을 것.\n")
+    if not is_yolo_split:
+        print("⚠️ 평가셋 오염 — 이 서브셋으로 학습된 모델일 수 있다. **델타로만** 읽을 것.\n")
+    else:
+        print()
 
     # arm A/B — 같은 이미지, 창만 다르다
     union_key = f"union(+{args.union})" if args.union else None
@@ -405,9 +439,11 @@ def main() -> int:
         "onnx": str(args.onnx.relative_to(ROOT)),
         "conf": args.conf, "iou": args.iou, "match_iou": args.match_iou,
         "imgsz": args.imgsz, "window_cy": args.window_cy,
-        "n_aihub": len(pairs), "baseline_window": base,
+        "n_aihub": len(pairs), "baseline_window": base, "src_layout": src_tag,
         "note": ("구간의 자는 arm A(배포 조건) 기준 640 환산으로 고정 · recall 분모는 "
-                 "프레임 전체(창 밖 GT 도 미탐) · 평가셋 오염이 있어 델타로만 인용할 것"),
+                 "프레임 전체(창 밖 GT 도 미탐) · " +
+                 ("평가셋 오염 가능성 있어 델타로만 인용할 것" if not is_yolo_split
+                  else "val 스플릿만 사용 — 학습분 오염 없음")),
         "aihub": aihub, "real": real,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"\n저장: {args.out.relative_to(ROOT)}")

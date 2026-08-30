@@ -1072,6 +1072,29 @@ uv run python scripts/roi_crop_eval.py `
 **산출물** `outputs/detect/c4e_roi_crop.json` ·
 재현 `uv run python scripts/roi_crop_eval.py --n 400 --windows "1.0x1.0,0.6x1.0,0.6x0.6" --union 0.6x0.6`
 
+#### ✅ 오염 검증 재실행 — 결론 재현 (2026-08-31)
+
+`roi_crop_eval.py`에 표준 YOLO 레이아웃(`images/<split>`·`labels/<split>`) 로더
+`load_yolo_split`을 추가해(`--src`가 그 구조면 자동 분기) `detect_v3`의 **val 스플릿만**
+(볼라드 GT 보유 1,994장 중 400장, seed 고정 — train 미포함이라 정의상 오염 없음)으로 다시
+쟀다. `c4e_s3_11n`(자체 학습 — val이 곧 held-out)과 `c4d_11n_640`(외부 인수분 — 이
+데이터셋 자체를 학습에 안 씀 → 완전 무오염 대조군) 두 모델 다 같은 400장을 쓴다.
+
+| | 원본(오염 가능 · 서브셋 전체) | clean `c4e_s3_11n`(val만) | clean `c4d_11n_640`(무관 계보) |
+|---|---|---|---|
+| union `<4px` recall Δ | +0.220 | **+0.193** | **+0.200** |
+| union 전체 recall Δ | +0.065 | +0.080 | +0.102 |
+| union FP Δ | +325(258→583) | +369(316→685) | +401(287→688) |
+| union 정밀도 | 0.798→0.654 | 0.791→0.658 | 0.777→0.627 |
+| 0.6×0.6 단일창 전체 recall Δ | −0.239 | −0.221 | −0.171 |
+
+세 열이 전부 같은 방향·비슷한 크기다 — `c4e_s3_11n` 자신을 오염 가능 셋과 val-only 셋으로
+비교해도, 이 데이터를 학습에 전혀 안 쓴 `c4d_11n_640`으로 모델을 바꿔도 결론이 안 바뀐다.
+**오염이 8/26 결론을 만든 게 아니었다** — E3(ROI 크롭 단일창·2패스 union 모두) 기각은
+**최종 확정**. 남은 것은 2장의 "주간 데이터다"뿐(→ `C5`).
+
+산출물 `outputs/detect/c4e_roi_crop_clean.json` · `outputs/detect/c4e_roi_crop_clean_c4d.json`
+
 ---
 
 ## 9-10. `C5` 1차 판정 — 자체 촬영 27장 (2026-08-30)

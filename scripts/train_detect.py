@@ -52,6 +52,9 @@
     uv run python scripts/train_detect.py --epochs 50 --batch 8
     uv run python scripts/train_detect.py --data outputs/datasets/detect_v2_loli6000/data.yaml \
         --name c4b_loli6000                                 # C4b 런1
+    uv run python scripts/train_detect.py --model yolo11n.pt \
+        --distill-model outputs/detect/c4f_11s_640_teacher/weights/best.pt --dis 6.0 \
+        --name c4f_distill_11n_640                          # 지식 증류 (교사 선행 학습 필요)
 """
 
 from __future__ import annotations
@@ -79,6 +82,10 @@ def parse_args():
                    help="⚠️ Windows 에서 'ram' 을 쓰지 말 것 — 아래 주의 참고")
     p.add_argument("--name", default="c4_baseline")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--distill-model", default=None,
+                   help="교사 가중치 경로 — 지정 시 지식 증류로 학습 (ultralytics 네이티브 지원)")
+    p.add_argument("--dis", type=float, default=6.0,
+                   help="증류 손실 가중치 (--distill-model 지정 시에만 적용)")
     return p.parse_args()
 
 
@@ -120,6 +127,8 @@ def main() -> None:
         hsv_h=0.010, hsv_s=0.4, hsv_v=0.3,
         # 계단·보행자 모두 상하 반전이 물리적으로 무의미하다
         flipud=0.0, fliplr=0.5,
+        distill_model=args.distill_model,
+        dis=args.dis,
     )
 
     metrics = model.val(data=str(args.data), imgsz=args.imgsz, device=0,
