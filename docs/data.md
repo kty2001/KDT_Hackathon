@@ -600,6 +600,7 @@ bbox 태스크 전량(300GB)을 받고 나니 **장수는 나오는데 계획이
 |----------|------|------|
 | **StairNet** (Mendeley) | 512×512, train 2,670 / val 424, 라벨은 **계단선 선분** `cls x1 y1 x2 y2` (0=convex, 1=concave) | ✅ 확보. **야간 505장(16.3%)** — train 429 / val 76. ⚠️ 코드·가중치 미공개 |
 | **RGB-D Stair Dataset** | train 4,776 / val 1,216 (RGB+Depth) | △ 단안 프로젝트라 RGB만 활용 가능 |
+| `data/external_stairs_night/` (8/31) | 14장 (CC BY 2.0/3.0, Openverse 경유) | ⚠️ **참고용 평가 전용, 학습 미사용**. own_night·StairNet val이 아닌 완전 외부 held-out을 만들려고 웹에서 수집. 라벨은 사람 손이 아니라 **AI 시각 추정** — 정밀도가 낮아 판정 근거로 쓰지 않는다. 출처는 `images_raw/sources.csv`, 결과·선정 기준은 → [runpod_distillation_20260831 5-7](runpod_distillation_20260831.md) |
 
 > ⚠️ 두 데이터셋 모두 **주간·실내 위주** → 야간 성능은 자체 야간 계단 촬영분 파인튜닝에 의존한다.
 

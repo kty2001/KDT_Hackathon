@@ -2,13 +2,17 @@
 
 > **이 파일만 읽고 작업을 시작할 수 있게** 유지한다. 다른 문서는 *필요할 때만* 연다.
 > 작업을 끝낼 때마다 **이 파일을 먼저** 고칠 것.
-> 갱신 **2026-08-31** — **지식 증류 실행 완료**(RunPod A100, 교사·학생 학습 → ONNX →
+> 갱신 **2026-09-01** — **DL 파트 발표용 시각화 노트북 신설**(`notebooks/dl_presentation_summary.ipynb`
+> — 학습곡선·증류 비교·`rec34` PR curve·후보 4종 비교를 흩어진 런 폴더·리뷰 노트북 2개에서
+> 재실행 없이 큐레이션. `scripts/build_presentation_assets.py` 로 재생성). **`outputs/presentation/`만
+> `.gitignore` 예외로 git 추적**하도록 바꿔 발표 이미지가 로컬 재생성 없이도 보이게 함(나머지
+> `outputs/`는 그대로 비추적).
+> 이전(2026-08-31): **지식 증류 실행 완료**(RunPod A100, 교사·학생 학습 → ONNX →
 > INT8 → `C5` own_night 4자 비교 → 정성 노트북 → **NightOwls rec34 교차 확인**(같은 날
 > 후속) — own_night(교사>학생)과 **방향이 뒤집힌다**(rec34는 학생이 교사보다 우세) →
 > **stairs 외부 야간 테스트셋(CC 이미지 14장, AI 라벨) 1차 시도** — recall 5종 전부
 > 0.19~0.25로 낮음, 참고용. 상세 [runpod_distillation_20260831](runpod_distillation_20260831.md)
-> 5장) ·
-> 이전(같은 날): `C4e` **E3 오염 검증 재실행**(clean val-only + `c4d_11n_640` 대조 —
+> 5장) · `C4e` **E3 오염 검증 재실행**(clean val-only + `c4d_11n_640` 대조 —
 > 결론 재현, **ROI 크롭 기각 최종 확정**) · 2026-08-30 `C5` **1차 판정 실행**(자체
 > 27장·`c4e_s3_11n` 우세) + `eval_own_night.py` 버그 수정 · 2026-08-28 `C4e` **E3 ROI 크롭
 > 기각**(+ 배포 conf 0.35→0.25 절반 정정) · `C10a` ③ ONNX 양자화(**8비트 채택 · 4비트·FP8
@@ -306,6 +310,7 @@
 | ExDark | 7,363장 | 실제 야간이나 **실내가 많음** |
 | LOL | 500쌍 | 벤치마크 비교용 |
 | **AIHub 인도보행** | bbox 전량 300GB(8/5) | `bollard` 유일 소스 · **주간 데이터셋**(실측 야간 **0.58%** → R2) |
+| `external_stairs_night`(8/31) | 14장 (CC BY, 웹 수집) | ⚠️ `stairs` **참고용** — own_night·StairNet val이 아닌 완전 외부 held-out. AI 추정 라벨이라 정밀도 낮음, 학습 미사용 (→ [data.md 4-5](data.md)) |
 
 > 📍 **실체는 전부 `D:\datasets\`** 이고 저장소 기준 경로 `data/<이름>` 이 **Junction** 이다
 > — 스크립트에 경로 분기가 없다. ✅ 5종 전부 연결됨(8/23). 명령은 → 3장 함정 15.
@@ -328,6 +333,7 @@
 | LSRW | ❌ 기각(미획득) | Baidu Pan 배포만 존재해 접근 불가 → LoLI-Street 로 대체 (→ [archive/data_decisions_2026-07.md](archive/data_decisions_2026-07.md) A-1) |
 | BDD100K | ❌ 후보 언급만 | [data.md](data.md) §6 에 보조 후보로만 등장, 코드 참조 없음 |
 | COCO | ❌ 데이터셋은 미사용 | `yolo11n.pt` 사전학습 가중치 출처·라벨 인덱스(80-class) 규약으로만 사용 |
+| `external_stairs_night` | ⚠️ 평가 전용(참고용), 학습 미사용 | `uv run yolo val data=data/external_stairs_night/data.yaml ...` 로만 사용. AI 라벨이라 판정 근거 아님 (→ [data.md 4-5](data.md)) |
 
 ---
 
@@ -355,6 +361,7 @@
 
 | 보고 싶은 것 | 노트북 |
 |---|---|
+| ★ **DL 파트 발표 요약** — 학습곡선·증류 비교·`rec34` PR curve·후보 4종 비교 한 곳에 | [dl_presentation_summary](../notebooks/dl_presentation_summary.ipynb) |
 | ④ `bollard` 색을 어떻게 골랐나 (색각이상 × 배경 대비) | [emphasis_palette_review](../notebooks/emphasis_palette_review.ipynb) |
 | c4d 라벨 검수 · 640 추론 · **실야간 추론** | [aihub_subset_review](../notebooks/aihub_subset_review.ipynb) |
 | 자체 3클래스 런 `c4e_s3_11n` 추론 | [c4e_infer](../notebooks/c4e_infer.ipynb) |
@@ -376,6 +383,7 @@
 
 | 항목 | 결과 | 원문 |
 |---|---|---|
+| ★ **DL 파트 발표용 시각화 노트북 신설** (9/1) | 학습곡선(`c4b_loli0`·`c4e_s3_11n`)·증류 teacher/student 학습곡선(RunPod라 로컬에 없던 `results.png`는 `results.csv`에서 `ultralytics.utils.plotting.plot_results`로 재생성)·`own_night` vs `rec34` 순위 역전 비교(`rec34` PR curve 포함)·후보 4종 예측 비교 5장·증류 학생 예측/GT 7장을 `notebooks/dl_presentation_summary.ipynb` 한 곳에 큐레이션. 두 리뷰 노트북(`c5_own_night_review.ipynb`·`c4f_distill_test_real_viz.ipynb`)은 재실행 없이 이미 저장된 출력만 디코드해 재사용(`scripts/build_presentation_assets.py`). **`.gitignore` 정책 변경** — `outputs/presentation/`만 예외로 git 추적하게 해 이미지가 로컬 재생성 없이도 보이도록 함(나머지 `outputs/`는 그대로 비추적) | `notebooks/dl_presentation_summary.ipynb` · `scripts/build_presentation_assets.py` |
 | ★★ **지식 증류 실행 완료 + NightOwls rec34 교차 확인 + stairs 외부 테스트셋** (8/31) | RunPod A100에서 교사(`c4f_11s_640_teacher`, mAP50 0.861)·학생(`c4f_distill_11n_640`, GPU 75% AutoBatch·100epoch 완주, mAP50 0.832) 학습 → 로컬 ONNX 변환·INT8 양자화(검출 불일치 0/7, 함정 20 재발 없음) → `C5` own_night(27장) 4자 비교 → **NightOwls rec34(1,001장·박스 1,576) 5자 재비교**(같은 날 후속, `eval_nightowls.py`에 `--device` 옵션 추가) → **stairs CC 라이선스 외부 이미지 14장(AI 라벨) 5자 재비교**(같은 날 후속). **own_night(교사 0.600>학생 0.554)과 rec34(학생 0.717>`c4e_s3_11n` 0.710>학생INT8 0.692>교사 0.689>`c4e_s3_11n`INT8 0.649) 순위가 뒤집힌다** — 표본이 큰 rec34에서는 오히려 학생이 최상위. INT8 하락 방향은 두 도메인에서 일치(학생 −0.025·`c4e_s3_11n` −0.061). stairs 외부 테스트셋은 mAP 방향이 own_night과 같으나(교사>학생) recall은 5종 전부 낮다(0.19~0.25) — 표본·라벨 정밀도 한계로 참고용. 🔴 원인 미상 · 배포 후보 확정은 아직 미룸(`C11`+`C2` 표본 확대 필요) | [runpod_distillation_20260831 5-6·5-7장](runpod_distillation_20260831.md) · `notebooks/c4f_distill_test_real_viz.ipynb` |
 | ★ **`C4e` E3 — 오염 검증 재실행, 기각 최종 확정** (8/31) | `roi_crop_eval.py`에 `detect_v3`(표준 YOLO 레이아웃) 로더 추가 → val 스플릿(400장·train 미포함)으로 재측정. `c4e_s3_11n`(val-only)·`c4d_11n_640`(이 데이터셋 자체를 학습에 안 쓴 무관 계보) 둘 다 원본과 같은 방향·비슷한 크기로 재현(union `<4px` Δ +0.193·+0.200 vs 원본 +0.220 · FP 증가 방향도 동일). **오염이 8/26 결론을 만들지 않았음을 측정으로 확인** | [detection.md 9-9-3](detection.md) |
 | ★★ **`C5` 1차 실행 — `c4e_s3_11n` 우세 확인 + INT8 포함 비교 노트북** (8/30) | 자체 27장에서 후보 4종(FP32 3 + INT8) 비교, `c4e_s3_11n` 전 축 우세. `eval_own_night.py` 버그 1건 수정 + Windows/Jupyter `model.val()` 함정(`workers=0` 필요) 발견 | [detection.md 9-10](detection.md) · `notebooks/c5_own_night_review.ipynb` |

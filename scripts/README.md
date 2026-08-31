@@ -1,7 +1,8 @@
 # scripts 인덱스
 
 > **스크립트를 열기 전에 여기서 찾을 것.** 각 파일의 상세 근거는 모듈 docstring 에 있다.
-> 모든 실행은 `uv run python scripts/<이름>.py`. 산출물은 전부 `outputs/`(git 비추적).
+> 모든 실행은 `uv run python scripts/<이름>.py`. 산출물은 전부 `outputs/`(git 비추적,
+> **`outputs/presentation/`만 예외로 추적** — 발표용 이미지).
 
 ## 공용 모듈 (import 해서 쓴다 — 단독 실행 아님)
 
@@ -52,6 +53,7 @@
 |---|---|
 | `inspect_datasets.py` | `data/` 배치 후 무결성 검증 (데이터 추가 시마다) |
 | `label_stats.py` | YOLO 라벨 박스 통계 — 라벨 **규칙 역산**(StairNet) + 자체 촬영분 **검수**(`C3`). 경계 접촉률·작은 박스 비율이 판정 지표 (→ [labeling_stairs.md](../docs/labeling_stairs.md)) |
+| `build_presentation_assets.py` | 발표용 시각화 노트북(`notebooks/dl_presentation_summary.ipynb`)이 참조하는 이미지·표를 `outputs/presentation/`(git 추적 예외)에 모은다 — 리뷰 노트북 2개(`c5_own_night_review.ipynb`·`c4f_distill_test_real_viz.ipynb`)의 기존 출력을 재실행 없이 디코드 + 증류 teacher/student `results.png`를 `results.csv`에서 재생성 + 학습곡선류 PNG 복사 |
 
 ---
 
