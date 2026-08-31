@@ -75,8 +75,8 @@ def parse_args():
     p.add_argument("--epochs", type=int, default=100)
     p.add_argument("--patience", type=int, default=20, help="조기종료 — 수렴하면 멈춘다")
     p.add_argument("--imgsz", type=int, default=640)
-    p.add_argument("--batch", type=int, default=16,
-                   help="VRAM 8GB 기준. OOM 이면 8 로 내릴 것")
+    p.add_argument("--batch", type=float, default=16,
+                   help="VRAM 8GB 기준. OOM 이면 8 로 내릴 것. 0~1 사이 값은 AutoBatch 목표 GPU 메모리 비율")
     p.add_argument("--workers", type=int, default=4, help="Windows 는 과도하면 불안정")
     p.add_argument("--cache", default="none", choices=["ram", "disk", "none"],
                    help="⚠️ Windows 에서 'ram' 을 쓰지 말 것 — 아래 주의 참고")

@@ -2,14 +2,22 @@
 
 ## 0. 결론 요약
 
-- 지식 증류(`docs/distillation_plan_20260829.md`) 실행을 **RunPod A100 SXM 80GB Pod**에서
-  진행 중이다. 이 세션이 끊겨도(다른 PC에서든) 아래 정보로 **같은 Pod에 다시 붙어** 이어갈
-  수 있다 — Pod는 세션과 무관하게 RunPod 서버에서 계속 돈다.
-- 가장 쉬운 재접속: **RunPod 웹 콘솔 → Pods → `bammasil-distill` → Connect → Web
-  Terminal**(브라우저 로그인만 있으면 SSH 키 없이 접속 가능).
-- 학습은 `tmux` 세션 안에서 돌고 있어 **SSH가 끊겨도 학습 자체는 안 죽는다.**
-- ⚠️ **다 쓰면 반드시 Pod를 종료할 것** — On-Demand A100 SXM은 **$1.59/hr** 과금 중이다
-  (잔액 $120에서 차감).
+- ✅ **지식 증류(`docs/distillation_plan_20260829.md`) 실행 완료** (2026-08-31) — 교사
+  (`c4f_11s_640_teacher`) · 학생 증류(`c4f_distill_11n_640`) 학습, ONNX 변환, INT8 양자화,
+  `C5`(own_night) 4자 비교, 정성 확인 노트북까지 끝냈다. **Pod는 `stop` 상태**(과금 중지 ·
+  볼륨은 유지)다. 상세 결과는 → **5장**.
+- 🔴 **아직 안 한 것 — NightOwls rec34 held-out 비교.** 이번 4자 비교는 `own_night`(27장)
+  하나로만 했다. 이 프로젝트의 판정 관례(`docs/STATUS.md` 3장 함정 1)는 **held-out(rec34)
+  또는 자체 촬영분(`C5`) 어느 하나가 아니라 서로 다른 도메인 두 곳에서 방향이 같은지 교차
+  확인**하는 것이다 — `data/NightOwls`가 이 PC에 없어(51,848장 중 해제 13,602장, 가볍게
+  옮길 크기가 아님) 아직 뚫지 못했다. **rec34까지 확인하기 전에는 이번 own_night 비교만으로
+  "학생이 배포 후보"라고 결론 내리지 말 것** — 5장 끝의 표는 단서이지 최종 판정이 아니다.
+- 이하는 Pod 재접속 절차(원본 내용, Pod를 다시 켤 때 유효):
+  - 가장 쉬운 재접속: **RunPod 웹 콘솔 → Pods → `bammasil-distill` → Connect → Web
+    Terminal**(브라우저 로그인만 있으면 SSH 키 없이 접속 가능).
+  - 학습은 `tmux` 세션 안에서 돌았다 — **SSH가 끊겨도 학습 자체는 안 죽는다.**
+  - ⚠️ **Pod를 다시 켜서 쓴다면 다 쓰고 반드시 종료할 것** — On-Demand A100 SXM은
+    **$1.59/hr** 과금이다(잔액 $120에서 차감).
 
 ## 1. Pod 정보
 
@@ -168,3 +176,102 @@ runpodctl pod remove a8u04go7tbztk0   # 완전 삭제(볼륨까지 제거 — �
   프리인스톨돼 있어 이 프로젝트의 `pyproject.toml` `pytorch-cu130` 인덱스와 바로 맞음.
 - Pod 생성 시 `--min-cuda-version 13.0`을 줘서 호스트 드라이버가 CUDA 13 미만인 곳에는
   배정되지 않도록 했다(실측: 드라이버 580.159.04, CUDA 13.0 확인됨).
+
+## 5. 결과 (2026-08-31 완료)
+
+### 5-1. 학생 증류 학습
+
+3장의 명령대로 Pod에서 실행하되, **GPU 사용량을 60%(기본 `--batch -1`) 대신 75%로
+올려서** 돌렸다. `scripts/train_detect.py`의 `--batch` 인자가 원래 `type=int`라 소수 비율
+(`0.75`)을 못 받아, **로컬·Pod 양쪽에서 `type=float`로 한 줄 수정**했다(ultralytics
+AutoBatch는 `--batch`에 0~1 사이 float를 주면 그 값을 목표 메모리 비율로 쓴다 —
+`autobatch.py`의 `fraction=batch if 0.0<batch<1.0 else 0.6`).
+
+```bash
+.venv/bin/python scripts/train_detect.py --model yolo11n.pt \
+    --distill-model outputs/detect/c4f_11s_640_teacher/weights/best.pt --dis 6.0 \
+    --data data/detect_v3/data.yaml --imgsz 640 --batch 0.75 \
+    --name c4f_distill_11n_640
+```
+
+- AutoBatch가 **batch 165**를 잡았다(59.06G/79.25G · 75% 정확히 반영, 교사 때는 60%에서
+  batch 75였음).
+- **100/100 epoch 끝까지 완주**(조기종료 없음), 총 소요 약 3시간 20분(교사는 95epoch·
+  3시간10분).
+- 최종 val(개발용, `detect_v3`): mAP50 **0.832** · mAP50-95 **0.601**
+  (person 0.714/0.439 · stairs 0.987/0.887 · bollard 0.796/0.478).
+  교사(`c4f_11s_640_teacher`, mAP50 0.861 · mAP50-95 0.630)보다 소폭 낮다 — 예상된 방향
+  (11n < 11s).
+- 가중치를 로컬로 회수: `outputs/detect/c4f_distill_11n_640/weights/{best,last}.pt`
+  (+ `results.csv`·`args.yaml`).
+
+### 5-2. ONNX 변환 · INT8 양자화 (로컬, CPU 전용 PC)
+
+기존 스크립트 그대로 재사용, 코드 변경 없음.
+
+```powershell
+uv run python scripts/export_onnx.py `
+  --weights outputs/detect/c4f_distill_11n_640/weights/best.pt `
+  --val-images outputs/datasets/aihub_colab_rehearsal/images/val
+uv run python scripts/quantize_onnx.py `
+  --onnx outputs/export/bammasil_det_c4f_distill_11n_640_640/bammasil_det_c4f_distill_11n_640_640.onnx
+```
+
+- ONNX: PT↔ONNX 정합성 ✅ 통과(개수 불일치 0/8 · 좌표 최대 0.0001px). 산출물
+  `outputs/export/bammasil_det_c4f_distill_11n_640_640/`.
+  ⚠️ `export_onnx.py`는 산출 폴더를 `OUT/<런이름>`(접두사 없음)으로 만드는데, 기존
+  교사·`c4e_s3_11n` 산출물은 `bammasil_det_<런이름>_<imgsz>/`(zip과 같은 이름)로 존재해
+  현재 스크립트 동작과 어긋난다(`git log`로 확인 — 이 로직은 바뀐 적이 없어 **기존 폴더가
+  생성 후 수동 개명된 것**으로 보임). 같은 규칙을 맞추려고 **`Move-Item`으로 개명**했다.
+- INT8: `outputs/quantization/bammasil_det_c4f_distill_11n_640_640-INT8/`. `generic`
+  3.15MB(3.37배 축소)·`qnn` 3.04MB(3.49배). FP32↔INT8 검출수 불일치 **0/7 둘 다** —
+  함정 20(전체 양자화 시 검출 0 붕괴) 재발 없음(`Conv`만 양자화 그대로 유효).
+  CPU 참고 지연: FP32 39.7ms → generic 45.2ms · qnn 63.1ms(⚠️ 참고치일 뿐 — 함정 3).
+
+### 5-3. `C5` own_night 4자 비교 — 교사·학생·`c4e_s3_11n`(FP32)·`c4e_s3_11n`-INT8
+
+`c4e_s3_11n`의 `.pt`가 이 PC에 없어 **FP32 ONNX**(`outputs/export/bammasil_det_c4e_s3_11n_640/`)
+로 대체했다. 결과는 `outputs/detect/c5_own_night_distill.json`(기존
+`c5_own_night_review.ipynb`가 참조하는 `c5_own_night.json`과는 별도 파일 — 안 건드림).
+
+```powershell
+uv run python scripts/eval_own_night.py `
+  --weights outputs/detect/c4f_11s_640_teacher/weights/best.pt `
+  --weights outputs/detect/c4f_distill_11n_640/weights/best.pt `
+  --weights outputs/export/bammasil_det_c4e_s3_11n_640/bammasil_det_c4e_s3_11n_640.onnx `
+  --weights outputs/quantization/bammasil_det_c4e_s3_11n_640-INT8/bammasil_det_c4e_s3_11n_640-INT8_generic.onnx `
+  --device cpu --out outputs/detect/c5_own_night_distill.json
+```
+
+conf 0.25 · own_night 27장(GT person 4·stairs 6·bollard 13) 기준:
+
+| | mAP50(종합) | recall | precision | F1 | 음성오탐(전체) |
+|---|---|---|---|---|---|
+| 교사 `c4f_11s_640_teacher` | 0.600 | 0.652 | 0.625 | 0.638 | 2 |
+| 학생 `c4f_distill_11n_640` | 0.554 | 0.652 | 0.556 | 0.600 | 5 |
+| `c4e_s3_11n`(FP32) | 0.523 | 0.696 | 0.593 | 0.640 | 4 |
+| `c4e_s3_11n`-INT8 | 0.525 | 0.739 | 0.654 | 0.694 | 4 |
+
+- person mAP50 전부 0.995(공통) · stairs는 GT 6개뿐이라 전 후보가 약함(교사·학생은
+  recall 0).
+- 학생은 교사 대비 recall은 유지(0.652)했지만 precision이 떨어져(음성 오탐 2→5) 종합
+  지표가 낮다.
+- `c4e_s3_11n`-INT8이 FP32보다 이 27장에서는 오히려 근소 우세 — **표본이 너무 작아
+  (GT 23개) 통계적 의미를 두지 말 것.**
+- ⚠️ **이 표는 `own_night` 단독 결과다** — 위 0장 요약대로 NightOwls rec34 교차 확인
+  전이라 "학생/교사 중 무엇이 낫다"의 최종 근거로 쓰지 말 것.
+
+### 5-4. 정성 확인 노트북
+
+`notebooks/c4f_distill_test_real_viz.ipynb` 신설 — `c5_own_night_review.ipynb`와 같은
+셀 구성(마크다운 개요 → 설정 → 성능 비교 표(5-3 재사용) → 예측 시각화 → GT 라벨 감사).
+`data/own_night`에서 `test_real_data` 유래 7장만 골라 학생 모델 단독으로 예측·GT를
+그린다. `jupyter_client`로 커널을 직접 띄워 **실행 결과(이미지 포함)까지 저장**했다
+(프로젝트에 `nbconvert`가 없어 새 의존성 추가 없이 이 방식을 씀).
+
+### 5-5. 다음에 할 것
+
+1. `data/NightOwls`(또는 최소 rec34분)를 이 PC로 옮겨 `scripts/eval_nightowls.py
+   --recordings 34 --drop-unlabeled-person`으로 교사·학생·`c4e_s3_11n`를 재비교.
+2. `docs/distillation_plan_20260829.md` 5-6절 채택 기준(`C11` 속도 + `C5` 야간 실측)을
+   마저 통과해야 배포 후보로 올릴 수 있다 — 이번 결과만으로는 아직 미달.
