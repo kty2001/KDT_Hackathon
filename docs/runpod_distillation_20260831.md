@@ -6,12 +6,16 @@
   (`c4f_11s_640_teacher`) · 학생 증류(`c4f_distill_11n_640`) 학습, ONNX 변환, INT8 양자화,
   `C5`(own_night) 4자 비교, 정성 확인 노트북까지 끝냈다. **Pod는 `stop` 상태**(과금 중지 ·
   볼륨은 유지)다. 상세 결과는 → **5장**.
-- 🔴 **아직 안 한 것 — NightOwls rec34 held-out 비교.** 이번 4자 비교는 `own_night`(27장)
-  하나로만 했다. 이 프로젝트의 판정 관례(`docs/STATUS.md` 3장 함정 1)는 **held-out(rec34)
-  또는 자체 촬영분(`C5`) 어느 하나가 아니라 서로 다른 도메인 두 곳에서 방향이 같은지 교차
-  확인**하는 것이다 — `data/NightOwls`가 이 PC에 없어(51,848장 중 해제 13,602장, 가볍게
-  옮길 크기가 아님) 아직 뚫지 못했다. **rec34까지 확인하기 전에는 이번 own_night 비교만으로
-  "학생이 배포 후보"라고 결론 내리지 말 것** — 5장 끝의 표는 단서이지 최종 판정이 아니다.
+- ✅ **NightOwls rec34 held-out 비교 완료** (2026-08-31, 같은 날 후속). `own_night`(27장)
+  비교와 **방향이 어긋난다** — rec34(1,001장·박스 1,576)에서는 **학생이 교사를 이긴다**
+  (mAP50 0.717 vs 0.689). own_night 단독 결과("교사가 낫다")를 최종 판정으로 쓰지 말라던
+  경고가 실제로 맞아떨어졌다. 상세 표·해석은 → **5-6장**.
+- ✅ **stairs 외부 야간 테스트셋(14장) 비교 완료** (2026-08-31, 같은 날 후속). rec34는
+  person만 재므로, own_night 외 도메인에서 `stairs`를 보려고 CC 라이선스 외부 이미지로
+  별도 held-out을 만들었다. 표본이 매우 작고(GT 16박스) **AI가 직접 그린 바운딩박스**라
+  own_night·rec34와 같은 신뢰 등급이 아니다 — 방향 참고용. **다섯 후보 전부 recall이
+  낮다**(0.19~0.25) — 다양한 촬영 스타일에 대한 일반화가 own_night·StairNet보다 어렵다는
+  신호. 상세 → **5-7장**.
 - 이하는 Pod 재접속 절차(원본 내용, Pod를 다시 켤 때 유효):
   - 가장 쉬운 재접속: **RunPod 웹 콘솔 → Pods → `bammasil-distill` → Connect → Web
     Terminal**(브라우저 로그인만 있으면 SSH 키 없이 접속 가능).
@@ -271,7 +275,131 @@ conf 0.25 · own_night 27장(GT person 4·stairs 6·bollard 13) 기준:
 
 ### 5-5. 다음에 할 것
 
-1. `data/NightOwls`(또는 최소 rec34분)를 이 PC로 옮겨 `scripts/eval_nightowls.py
-   --recordings 34 --drop-unlabeled-person`으로 교사·학생·`c4e_s3_11n`를 재비교.
+1. ✅ ~~`data/NightOwls`(또는 최소 rec34분)를 이 PC로 옮겨 `scripts/eval_nightowls.py
+   --recordings 34 --drop-unlabeled-person`으로 교사·학생·`c4e_s3_11n`를 재비교.~~ →
+   **완료(5-6장)** — `data/NightOwls`는 이미 이 PC에 Junction으로 연결돼 있었다(8/31 재확인).
 2. `docs/distillation_plan_20260829.md` 5-6절 채택 기준(`C11` 속도 + `C5` 야간 실측)을
    마저 통과해야 배포 후보로 올릴 수 있다 — 이번 결과만으로는 아직 미달.
+3. 🔴 **own_night과 rec34가 교사/학생 우열을 뒤집는다** — 왜 뒤집히는지(표본 크기·
+   촬영 시점 차이·클래스 구성 차이 등) 아직 원인 규명 안 됨. `C2` 추가 촬영으로
+   own_night 표본을 키우기 전까지는 어느 쪽도 확정적 근거가 아니다.
+4. ✅ ~~stairs를 own_night 외 데이터로도 확인~~ → **완료(5-7장)** — 단 AI가 그린 라벨
+   14장뿐이라 참고용. `C2`가 stairs의 유일한 정식 판정 수단이라는 결론은 그대로다.
+
+### 5-6. NightOwls rec34 교차 확인 (2026-08-31 완료)
+
+`docs/STATUS.md` 3장 함정 1의 관례대로 own_night(27장)과 별개 도메인인 NightOwls
+held-out(rec34, 학습 미사용)에서 같은 5개 후보를 재측정했다. `data/NightOwls`는 이미
+Junction으로 로컬에 연결돼 있었고(`c4e_s3_11n`의 `.pt`도 로컬에 있어 ONNX 대체 불필요),
+`scripts/eval_nightowls.py`에 `--device` 옵션을 추가해(기존 GPU 고정 → `--device cpu`로
+INT8 ONNX 평가 가능, `eval_own_night.py`의 기존 패턴과 동일) 5건을 각각 실행했다.
+
+```powershell
+uv run python scripts/eval_nightowls.py --recordings 34 --drop-unlabeled-person `
+  --weights outputs/detect/c4f_11s_640_teacher/weights/best.pt --device 0
+uv run python scripts/eval_nightowls.py --recordings 34 --drop-unlabeled-person `
+  --weights outputs/detect/c4f_distill_11n_640/weights/best.pt --device 0
+uv run python scripts/eval_nightowls.py --recordings 34 --drop-unlabeled-person `
+  --weights outputs/quantization/bammasil_det_c4f_distill_11n_640_640-INT8/bammasil_det_c4f_distill_11n_640_640-INT8_generic.onnx `
+  --device cpu --name c4f_distill_11n_640_INT8__rec34_labeled
+uv run python scripts/eval_nightowls.py --recordings 34 --drop-unlabeled-person `
+  --weights outputs/detect/c4e_s3_11n/weights/best.pt --device 0
+uv run python scripts/eval_nightowls.py --recordings 34 --drop-unlabeled-person `
+  --weights outputs/quantization/bammasil_det_c4e_s3_11n_640-INT8/bammasil_det_c4e_s3_11n_640-INT8_generic.onnx `
+  --device cpu --name c4e_s3_11n_INT8__rec34_labeled
+```
+
+rec34(`--drop-unlabeled-person`) 이미지 1,001장 · pedestrian 박스 1,576개 기준:
+
+| | mAP50 | mAP50-95 | precision | recall | stairs 오탐 |
+|---|---|---|---|---|---|
+| 교사 `c4f_11s_640_teacher` | 0.689 | 0.360 | 0.824 | 0.633 | 0.0% |
+| 학생 `c4f_distill_11n_640`(FP32) | **0.717** | 0.361 | 0.836 | **0.668** | 0.0% |
+| 학생 INT8 | 0.692 | 0.362 | 0.850 | 0.631 | 0.0% |
+| `c4e_s3_11n`(FP32) | 0.710 | 0.354 | 0.787 | 0.635 | 0.0% |
+| `c4e_s3_11n` INT8 | 0.649 | 0.332 | 0.794 | 0.582 | 0.0% |
+
+(`c4e_s3_11n` FP32 행은 STATUS 후보표의 기존 수치 0.710/0.635/0.0%와 정확히 일치 — 하네스
+재현성 확인됨.)
+
+**own_night과 방향이 어긋난다.**
+
+- own_night: 교사(0.600) > 학생(0.554) > `c4e_s3_11n` INT8(0.525) ≈ FP32(0.523).
+- rec34: **학생(0.717) > `c4e_s3_11n` FP32(0.710) > 학생 INT8(0.692) > 교사(0.689)** >
+  `c4e_s3_11n` INT8(0.649).
+
+학생이 own_night에서는 교사보다 못했지만(정밀도 하락·음성오탐 2→5), 표본이 27장(GT 23개)
+뿐이라 통계적으로 얇았다. rec34는 GT 1,576개로 표본이 훨씬 크고, 여기서는 **교사가 오히려
+5개 후보 중 최하위권**(FP32 중 최저)이다. 즉 이번 4/5자 비교에서 "학생이 교사보다 나쁘다"는
+own_night만의 결론이었고, 서로 다른 도메인에서 방향이 반대로 나왔다 — `docs/STATUS.md`
+3장 함정 1("판정은 항상 held-out 또는 자체 촬영분에서 하되, 한쪽만 보고 결론 내리지 말 것")이
+경고한 바로 그 상황이다.
+
+양자화(INT8) 효과는 두 도메인에서 **방향이 일치**한다 — 학생·`c4e_s3_11n` 둘 다 INT8이
+FP32보다 mAP50이 낮다(학생 −0.025 · `c4e_s3_11n` −0.061). own_night에서 `c4e_s3_11n`
+INT8이 FP32보다 근소 우세로 나온 건 표본이 작아서(GT 23개) 생긴 노이즈였을 가능성이 크다 —
+rec34(GT 1,576개)의 하락 방향이 더 신뢰할 만하다. stairs 오탐은 5건 전부 0.0%로 own_night과
+같은 방향(NightOwls엔 계단 GT가 없어 오탐만 셈).
+
+⚠️ 남는 한계 — NightOwls는 **차량 대시캠 시점**이라 보행 시점과 다르고, `bollard`·`stairs`
+GT가 없어 person만 잰다(→ 함정 없음, 기존 하네스 설계 그대로). 교사/학생 순위가 왜
+도메인마다 뒤집히는지는 원인 미상 — `C2` 자체 촬영이 늘어야 own_night 쪽 표본 신뢰도가
+개선된다.
+
+### 5-7. stairs 외부 야간 테스트셋 (2026-08-31 완료)
+
+rec34는 person만 잰다 — `stairs`는 own_night(GT 6개)에서만 측정된 채였다. 기존 프로젝트
+자산인 StairNet 야간 76장(`scripts/eval_stairs_night.py`)은 `detect_v3`의 val 스플릿에
+그대로 들어가 있어(→ `build_detect_dataset.py:add_stairs`) teacher/student `best.pt`
+체크포인트 선택(val fitness)에 이미 관여했고, "계단이 화면을 채운 사진"이라 원거리 접근
+구간도 못 잰다. 그래서 **완전히 새로운 외부 이미지**로 별도 held-out을 만들었다.
+
+**소싱** — Openverse API(`api.openverse.org`, Flickr·Wikimedia Commons의 CC0/CC-BY 이미지
+통합 검색)로 "stairs at night" 등 6개 검색어를 돌려 79장을 모으고, 육안 검수로 **14장**을
+채택했다(실내 장식적 나선계단·필름 스캔 아티팩트·과도한 포스터라이즈·극단적 어안왜곡·계단이
+실제로 안 보이는 사진 등은 제외). 근거리·원거리·다중 플라이트(계단참 너머 2번째 플라이트)·
+사람 포함·순수 배경(계단이 안 보이는 오탐 검증용 네거티브 1장)을 섞었다. 출처·라이선스는
+`data/external_stairs_night/images_raw/sources.csv`에 기록(전부 CC BY 2.0/3.0).
+
+**라벨링** — `docs/labeling_stairs.md` 기준(2단 이상만 `stairs`, 계단 전체를 1박스, 별개
+플라이트는 각각 1박스)을 따르되, **클릭 드래그 도구가 아니라 이미지를 보고 바운딩박스
+좌표를 시각적으로 추정**했다. own_night·rec34와 달리 사람 손 라벨이 아니므로 정밀도가
+낮다 — 대표 이미지 4장을 박스 오버레이로 재검토해 대략적으로는 맞음을 확인했지만, 픽셀
+단위 정확도는 보장 못 한다. **이 결과는 방향 참고용이지 최종 판정 근거가 아니다.**
+
+**평가** — `scripts/eval_stairs_night.py`는 소스 경로가 고정돼 있어 외부 데이터를 못 받는다.
+새 스크립트 대신 ultralytics 기본 CLI로 5종을 재사용 데이터셋(`data/external_stairs_night/
+data.yaml`)에 대해 돌렸다:
+
+```powershell
+uv run yolo val model=<가중치> data=data/external_stairs_night/data.yaml imgsz=640 device=<0|cpu>
+```
+
+이미지 14장(양성 13 · 음성 1) · GT 박스 16개 기준:
+
+| | mAP50 | mAP50-95 | precision | recall |
+|---|---|---|---|---|
+| 교사 `c4f_11s_640_teacher` | **0.228** | 0.063 | 0.729 | 0.188 |
+| 학생 `c4f_distill_11n_640`(FP32) | 0.176 | 0.057 | 0.398 | 0.250 |
+| 학생 INT8 | 0.148 | 0.033 | 0.411 | 0.188 |
+| `c4e_s3_11n`(FP32) | 0.162 | 0.036 | 0.354 | 0.250 |
+| `c4e_s3_11n` INT8 | 0.221 | 0.046 | 0.647 | 0.250 |
+
+음성 이미지(계단 없는 배경 1장) FP — 5종 전부 **0박스**(conf 0.25 기준, 함정 20 재발 없음).
+
+**읽는 법** — GT 16개뿐이라 recall 한 칸 차이가 0.0625 단위로 뛴다. 정밀 순위 판정에
+쓰지 말고 방향만 본다:
+
+- mAP50은 own_night과 같은 방향(교사 > 학생)이나, **recall은 학생이 교사보다 오히려
+  높다**(0.250 vs 0.188) — precision 차이가 mAP를 가른다. own_night의 "학생이 정밀도에서
+  밀린다"는 관찰과 결이 같다.
+- **다섯 후보 전부 recall이 0.19~0.25로 낮다** — own_night(stairs recall은 GT가 6개뿐이라
+  단정 못 하지만) · StairNet 야간(mAP50 0.993, → STATUS 2장 4번)보다 뚜렷이 나쁘다. 학습
+  분포(StairNet·자체 촬영)와 다른 촬영 스타일(다양한 카메라·구도·조명)에 대한 일반화가
+  약하다는 신호로 읽을 수 있다 — 다만 라벨 정밀도가 낮은 점을 감안해야 한다.
+- INT8 방향은 후보마다 다르다(학생은 하락, `c4e_s3_11n`은 오히려 상승) — GT 16개에서는
+  한 검출 차이가 방향을 뒤집을 수 있어 이 결과만으로 INT8 stairs 성능을 판정하지 않는다.
+
+⚠️ **이 결과는 `C2` 자체 야간 촬영을 대체하지 않는다** — 라벨이 AI 추정치이고 표본이
+14장뿐이다. StairNet·own_night과 달리 사람 손 검수를 거치지 않았으므로, 배포 판단에는
+쓰지 말고 "방향이 own_night과 비슷한지" 정도의 참고로만 쓴다.

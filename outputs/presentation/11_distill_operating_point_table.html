@@ -1,0 +1,189 @@
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>recall</th>
+      <th>precision</th>
+      <th>f1</th>
+      <th>tp</th>
+      <th>fp</th>
+      <th>fn</th>
+    </tr>
+    <tr>
+      <th>run</th>
+      <th>class</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="4" valign="top">c4f_11s_640_teacher</th>
+      <th>person</th>
+      <td>1.000</td>
+      <td>0.667</td>
+      <td>0.800</td>
+      <td>4</td>
+      <td>2</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>stairs</th>
+      <td>0.000</td>
+      <td>0.000</td>
+      <td>NaN</td>
+      <td>0</td>
+      <td>5</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <th>bollard</th>
+      <td>0.846</td>
+      <td>0.846</td>
+      <td>0.846</td>
+      <td>11</td>
+      <td>2</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>종합</th>
+      <td>0.652</td>
+      <td>0.625</td>
+      <td>0.638</td>
+      <td>15</td>
+      <td>9</td>
+      <td>8</td>
+    </tr>
+    <tr>
+      <th rowspan="4" valign="top">c4f_distill_11n_640</th>
+      <th>person</th>
+      <td>1.000</td>
+      <td>0.800</td>
+      <td>0.889</td>
+      <td>4</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>stairs</th>
+      <td>0.000</td>
+      <td>0.000</td>
+      <td>NaN</td>
+      <td>0</td>
+      <td>6</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <th>bollard</th>
+      <td>0.846</td>
+      <td>0.688</td>
+      <td>0.759</td>
+      <td>11</td>
+      <td>5</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>종합</th>
+      <td>0.652</td>
+      <td>0.556</td>
+      <td>0.600</td>
+      <td>15</td>
+      <td>12</td>
+      <td>8</td>
+    </tr>
+    <tr>
+      <th rowspan="4" valign="top">bammasil_det_c4e_s3_11n_640</th>
+      <th>person</th>
+      <td>1.000</td>
+      <td>0.800</td>
+      <td>0.889</td>
+      <td>4</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>stairs</th>
+      <td>0.167</td>
+      <td>0.167</td>
+      <td>0.167</td>
+      <td>1</td>
+      <td>5</td>
+      <td>5</td>
+    </tr>
+    <tr>
+      <th>bollard</th>
+      <td>0.846</td>
+      <td>0.688</td>
+      <td>0.759</td>
+      <td>11</td>
+      <td>5</td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <th>종합</th>
+      <td>0.696</td>
+      <td>0.593</td>
+      <td>0.640</td>
+      <td>16</td>
+      <td>11</td>
+      <td>7</td>
+    </tr>
+    <tr>
+      <th rowspan="4" valign="top">bammasil_det_c4e_s3_11n_640-INT8</th>
+      <th>person</th>
+      <td>1.000</td>
+      <td>1.000</td>
+      <td>1.000</td>
+      <td>4</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>stairs</th>
+      <td>0.167</td>
+      <td>0.167</td>
+      <td>0.167</td>
+      <td>1</td>
+      <td>5</td>
+      <td>5</td>
+    </tr>
+    <tr>
+      <th>bollard</th>
+      <td>0.923</td>
+      <td>0.750</td>
+      <td>0.828</td>
+      <td>12</td>
+      <td>4</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>종합</th>
+      <td>0.739</td>
+      <td>0.654</td>
+      <td>0.694</td>
+      <td>17</td>
+      <td>9</td>
+      <td>6</td>
+    </tr>
+  </tbody>
+</table>
+</div>

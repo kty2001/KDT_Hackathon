@@ -71,6 +71,7 @@ def parse_args():
     p.add_argument("--conf", type=float, default=0.25, help="오탐 집계용 임계")
     p.add_argument("--fp-only", action="store_true",
                    help="mAP 는 건너뛰고 stairs 오탐만 센다 (GT 없는 recording 용)")
+    p.add_argument("--device", default="0", help="'0' 또는 'cpu' (INT8 ONNX 는 cpu)")
     p.add_argument("--name", default="", help="ultralytics run 이름 (기본: 자동 생성)")
     p.add_argument("--dst", type=Path, default=None)
     p.add_argument("--rebuild", action="store_true", help="변환본을 다시 만든다")
@@ -140,10 +141,10 @@ def build(args, recs: set[str]) -> tuple[int, int, int]:
     return len(picked), n_box, n_dropped
 
 
-def scan_stairs_fp(model, img_dir: Path, conf: float, imgsz: int) -> tuple[int, int, int]:
+def scan_stairs_fp(model, img_dir: Path, conf: float, imgsz: int, device: str) -> tuple[int, int, int]:
     """stairs 예측을 직접 센다 — NightOwls 에 계단이 없으므로 전부 오탐이다."""
     n_img = n_fp_img = n_fp_box = 0
-    for r in model.predict(source=str(img_dir), conf=conf, imgsz=imgsz, device=0,
+    for r in model.predict(source=str(img_dir), conf=conf, imgsz=imgsz, device=device,
                            stream=True, verbose=False):
         n_img += 1
         k = int((r.boxes.cls == STAIRS_ID).sum()) if r.boxes is not None else 0
@@ -183,7 +184,7 @@ def main() -> None:
     model = YOLO(str(args.weights))
 
     if not args.fp_only:
-        m = model.val(data=str(args.dst / "data.yaml"), imgsz=args.imgsz, device=0,
+        m = model.val(data=str(args.dst / "data.yaml"), imgsz=args.imgsz, device=args.device,
                       project=str(ROOT / "outputs/detect"), name=run_name,
                       exist_ok=True, plots=True)
 
@@ -201,7 +202,7 @@ def main() -> None:
     print("\n" + "=" * 78)
     print(f"stairs 오탐 (conf {args.conf}) — NightOwls 에 계단은 사실상 없다")
     print("=" * 78)
-    t, fi, fb = scan_stairs_fp(model, args.dst / "images/val", args.conf, args.imgsz)
+    t, fi, fb = scan_stairs_fp(model, args.dst / "images/val", args.conf, args.imgsz, args.device)
     print(f"  오탐 이미지 {fi:,} / {t:,}  ({fi / t:.1%})  ·  오탐 박스 {fb:,}")
 
     print("\n⚠️ 차량 주행 시점이라 보행 시점과 다르다 — 최종 판정은 자체 촬영분(C5).")

@@ -2,7 +2,8 @@
 .env
 
 data/
-outputs/
+outputs/*
+!outputs/presentation/
 __pycache__/
 .ipynb_checkpoints/
 

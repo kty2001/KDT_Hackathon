@@ -3,8 +3,11 @@
 > **이 파일만 읽고 작업을 시작할 수 있게** 유지한다. 다른 문서는 *필요할 때만* 연다.
 > 작업을 끝낼 때마다 **이 파일을 먼저** 고칠 것.
 > 갱신 **2026-08-31** — **지식 증류 실행 완료**(RunPod A100, 교사·학생 학습 → ONNX →
-> INT8 → `C5` own_night 4자 비교 → 정성 노트북. 🔴 NightOwls rec34 교차 확인 아직
-> 안 함 — 상세 [runpod_distillation_20260831](runpod_distillation_20260831.md) 5장) ·
+> INT8 → `C5` own_night 4자 비교 → 정성 노트북 → **NightOwls rec34 교차 확인**(같은 날
+> 후속) — own_night(교사>학생)과 **방향이 뒤집힌다**(rec34는 학생이 교사보다 우세) →
+> **stairs 외부 야간 테스트셋(CC 이미지 14장, AI 라벨) 1차 시도** — recall 5종 전부
+> 0.19~0.25로 낮음, 참고용. 상세 [runpod_distillation_20260831](runpod_distillation_20260831.md)
+> 5장) ·
 > 이전(같은 날): `C4e` **E3 오염 검증 재실행**(clean val-only + `c4d_11n_640` 대조 —
 > 결론 재현, **ROI 크롭 기각 최종 확정**) · 2026-08-30 `C5` **1차 판정 실행**(자체
 > 27장·`c4e_s3_11n` 우세) + `eval_own_night.py` 버그 수정 · 2026-08-28 `C4e` **E3 ROI 크롭
@@ -148,6 +151,10 @@
      표본이 없다**는 데이터 문제였다 (→ [detection.md 9-6·11-3c](detection.md))
    - 🔴 **남은 미검증은 원거리 계단 하나** — 야간 답은 `C2` 뿐. 주간은 AIHub 노면 마스킹이
      처음으로 잴 수단인데 **아직 안 받았다**(→ TODO `W5` · [detection.md 8-3](detection.md))
+   - 🟡 **CC 라이선스 외부 이미지 14장(AI 라벨)으로 1차 참고 시도**(8/31, → [runpod_distillation_20260831
+     5-7](runpod_distillation_20260831.md)) — 원거리·다중 플라이트 포함해 봤으나 사람 손
+     라벨이 아니고 표본이 작아 **`C2`를 대체하지 못한다.** recall 5종 전부 0.19~0.25로
+     낮게 나와 "다양한 촬영 스타일 일반화가 약하다"는 방향만 참고.
 5. 🟡 **`bollard` — 데이터·배선·학습은 끝났고 남은 것은 야간 판정 하나**
    - ✅ 좁은 정의 확정(8/22) · AIHub 3클래스 변환본 **113,163장** 확보 · 배선
      `aihub_subset_to_yolo.py`(8/23) · 자체 3클래스 런 완료
@@ -369,7 +376,7 @@
 
 | 항목 | 결과 | 원문 |
 |---|---|---|
-| ★★ **지식 증류 실행 완료** (8/31) | RunPod A100에서 교사(`c4f_11s_640_teacher`, mAP50 0.861)·학생(`c4f_distill_11n_640`, GPU 75% AutoBatch·100epoch 완주, mAP50 0.832) 학습 → 로컬 ONNX 변환·INT8 양자화(검출 불일치 0/7, 함정 20 재발 없음) → `C5` own_night(27장) 4자 비교(교사·학생·`c4e_s3_11n` FP32·INT8) → 정성 확인 노트북. **학생이 교사보다 종합 지표는 낮음**(recall 유지·precision 하락, 음성오탐 2→5). 🔴 **NightOwls rec34 held-out 교차 확인 아직 안 함**(데이터 로컬에 없음) — own_night 단독 결과라 최종 채택 판단(`C11`+`C5` 통과 기준)에는 아직 못 씀 | [runpod_distillation_20260831 5장](runpod_distillation_20260831.md) · `notebooks/c4f_distill_test_real_viz.ipynb` |
+| ★★ **지식 증류 실행 완료 + NightOwls rec34 교차 확인 + stairs 외부 테스트셋** (8/31) | RunPod A100에서 교사(`c4f_11s_640_teacher`, mAP50 0.861)·학생(`c4f_distill_11n_640`, GPU 75% AutoBatch·100epoch 완주, mAP50 0.832) 학습 → 로컬 ONNX 변환·INT8 양자화(검출 불일치 0/7, 함정 20 재발 없음) → `C5` own_night(27장) 4자 비교 → **NightOwls rec34(1,001장·박스 1,576) 5자 재비교**(같은 날 후속, `eval_nightowls.py`에 `--device` 옵션 추가) → **stairs CC 라이선스 외부 이미지 14장(AI 라벨) 5자 재비교**(같은 날 후속). **own_night(교사 0.600>학생 0.554)과 rec34(학생 0.717>`c4e_s3_11n` 0.710>학생INT8 0.692>교사 0.689>`c4e_s3_11n`INT8 0.649) 순위가 뒤집힌다** — 표본이 큰 rec34에서는 오히려 학생이 최상위. INT8 하락 방향은 두 도메인에서 일치(학생 −0.025·`c4e_s3_11n` −0.061). stairs 외부 테스트셋은 mAP 방향이 own_night과 같으나(교사>학생) recall은 5종 전부 낮다(0.19~0.25) — 표본·라벨 정밀도 한계로 참고용. 🔴 원인 미상 · 배포 후보 확정은 아직 미룸(`C11`+`C2` 표본 확대 필요) | [runpod_distillation_20260831 5-6·5-7장](runpod_distillation_20260831.md) · `notebooks/c4f_distill_test_real_viz.ipynb` |
 | ★ **`C4e` E3 — 오염 검증 재실행, 기각 최종 확정** (8/31) | `roi_crop_eval.py`에 `detect_v3`(표준 YOLO 레이아웃) 로더 추가 → val 스플릿(400장·train 미포함)으로 재측정. `c4e_s3_11n`(val-only)·`c4d_11n_640`(이 데이터셋 자체를 학습에 안 쓴 무관 계보) 둘 다 원본과 같은 방향·비슷한 크기로 재현(union `<4px` Δ +0.193·+0.200 vs 원본 +0.220 · FP 증가 방향도 동일). **오염이 8/26 결론을 만들지 않았음을 측정으로 확인** | [detection.md 9-9-3](detection.md) |
 | ★★ **`C5` 1차 실행 — `c4e_s3_11n` 우세 확인 + INT8 포함 비교 노트북** (8/30) | 자체 27장에서 후보 4종(FP32 3 + INT8) 비교, `c4e_s3_11n` 전 축 우세. `eval_own_night.py` 버그 1건 수정 + Windows/Jupyter `model.val()` 함정(`workers=0` 필요) 발견 | [detection.md 9-10](detection.md) · `notebooks/c5_own_night_review.ipynb` |
 | ★ **`C4e` E3 — ROI 크롭 기각** (8/26) | 신설 `scripts/roi_crop_eval.py`(3-arm — **정보 증가 0 인 arm** 을 끼워 스케일 효과와 해상도 효과를 가른다). 단일 창은 전체 recall **−0.18~−0.24** · 2패스는 `<4px` **+0.220** 이나 **FP 2.26배**(정밀도 0.798→0.654). ★★ 그 +0.220 이 **정보 증가 0** 에서 났다 — `<4px` 미탐은 *정보*가 아니라 **스케일** 문제이고, 이는 **용량 축(`11s`·distillation) 근거를 굳힌다**. ★ 리뷰 문서의 "볼라드는 화면 하단에 몰린다" 전제도 **정정**(작은 볼라드는 cy 중앙 0.48). ~~🟡 평가셋에 학습분 최대 ~9% — 학습 PC 재확인 대기~~ → **8/31 재확인 완료(위 행)** | [detection.md 9-9-3](detection.md) |
