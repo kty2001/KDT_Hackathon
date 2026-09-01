@@ -183,6 +183,24 @@ LSRW 제외로 생긴 "타깃 기기(스마트폰) 센서 도메인" 공백을 �
 대체하지는 않지만 **`C5`를 처음으로 돌릴 만큼은 채워졌다** — 결과는
 → [detection.md 9-10](detection.md).
 
+🆕 **병합(9/1)** — `data/own_night_KU/`(건국대 캠퍼스 신규 촬영, KakaoTalk 내보내기
+18장, base+`_01,_02,_07~_16,_19~_23`)가 도착했다. 위 27장과 합쳐 **`data/own_night/`가
+45장**이 됐다. 세 소스(`test_real_data` 7 → `test_real_data2` 20 → `own_night_KU` 18)를
+촬영 순서로 이어 `own_night_0001`~`own_night_0045.jpg`로 **일괄 리네임**했다
+(`scripts/merge_own_night.py`, 매핑은 `data/own_night/manifest.csv`에 gitignored 상태로
+보존). 원본 3개 폴더(`test_real_data`, `test_real_data2`, `own_night_KU`)는 손대지
+않는다. 신규 18장의 라벨(`own_night_0028`~`own_night_0045`)은 기존 27장과 **같은
+방법**(Claude 육안 라벨·전용 툴 아님·근사치)으로 채웠다 — `C3`(정식 라벨링)를 여전히
+대체하지 않는다.
+
+⚠️ **cv2 vs 뷰어 방향 함정** — `own_night_KU`(5712×4284 원본, EXIF `Orientation=6`)로
+이 문제를 처음 확인했다: `cv2.imread`는 EXIF 방향을 자동 반영해 세로로 바로 세운
+프레임(4284×5712)을 내놓지만, 일반 이미지 뷰어 중 EXIF를 무시하고 원본 그대로(가로)
+보여주는 것들이 있다. 라벨은 반드시 **`cv2.imread`가 실제로 내놓는 프레임**(=학습·추론이
+읽는 프레임) 기준으로 좌표를 잡아야 한다 — 뷰어가 보여주는 프레임과 다르면 bbox가
+완전히 어긋난다. 기존 27장도 같은 EXIF 태그(`Orientation=6`)를 갖고 있어 동일 원칙이
+소급 적용된다(라벨은 `cv2` 프레임 기준으로 이미 정합됨, 확인 완료).
+
 ### 2-3. ② 처리 방식 — ✅ **고전 CV 로 확정** (8/1)
 
 | 당시 미결 | 결정 | 시점 |

@@ -132,6 +132,10 @@
    [labeling_stairs.md](labeling_stairs.md)) · 클래스 3종 확정(8/22)으로 전제가 전부 풀렸다.
    - 🟢 **`test_real_data2`(20장·8/30)가 1차분으로 들어왔고 `C5`를 한 번 돌렸다**(→ 1장) —
      아래 두 항목은 여전히 미해결
+   - 🟢 **`own_night_KU`(건국대 캠퍼스·18장·9/1)도 같은 방식으로 병합·라벨링**(→ 1장) —
+     `own_night` 45장으로 늘었으나 **여전히 육안 근사 라벨**이라 `C3` 정식 라벨링을
+     대체하지 않는다. 원거리 계단·소형 볼라드 표본이 늘긴 했지만 QA(`label_stats.py`)로
+     확인한 stairs `height<32px` 는 여전히 **≈0%** — 아래 원거리 계단 항목은 그대로 열려 있다
    - ⚠️ **멀리서 계단에 접근하는 구간**을 반드시 넣을 것 — 없으면 `stairs` 최대 미검증
      항목(원거리 계단)이 이번에도 측정 불가로 남는다
    - 🔴 **볼라드 구간 필수** — AIHub 로는 야간 볼라드를 영영 못 잰다(→ R2) · 8/30분은
@@ -155,6 +159,10 @@
      표본이 없다**는 데이터 문제였다 (→ [detection.md 9-6·11-3c](detection.md))
    - 🔴 **남은 미검증은 원거리 계단 하나** — 야간 답은 `C2` 뿐. 주간은 AIHub 노면 마스킹이
      처음으로 잴 수단인데 **아직 안 받았다**(→ TODO `W5` · [detection.md 8-3](detection.md))
+   - 🔴 **9/1 45장 6종 비교에서 `stairs` recall 이 전 모델 0~0.056로 사실상 0 확인**(→ 1장
+     최근완료 · [detection.md 9-11](detection.md)) — 원거리 접근 구간을 표본에 넣었는데도
+     안 올랐다. "표본이 없어서 못 잰다"를 넘어 "표본이 있어도 못 잡는다"는 근거로 무게가
+     옮겨간다 — `C3` 정식 라벨링·더 큰 표본으로도 재확인 필요
    - 🟡 **CC 라이선스 외부 이미지 14장(AI 라벨)으로 1차 참고 시도**(8/31, → [runpod_distillation_20260831
      5-7](runpod_distillation_20260831.md)) — 원거리·다중 플라이트 포함해 봤으나 사람 손
      라벨이 아니고 표본이 작아 **`C2`를 대체하지 못한다.** recall 5종 전부 0.19~0.25로
@@ -320,8 +328,10 @@
 **NightOwls recording 배치 (고정)**: train `36·none·37` / val `35` / **test `34`** / 제외 `38`
 
 **실촬영 테스트 소재** `data/test_real_data/`(8/8·7장+동영상5) + `data/test_real_data2/`
-(8/30 신규·20장, `C2`의 1차분 성격 · 사람 표본 최초 포함) — 합쳐 **`data/own_night/`로
-라벨을 채워 `C5`에 썼다**. 장면 구성·정정 내역 상세는 → [data.md 2-2-1](data.md).
+(8/30 신규·20장, `C2`의 1차분 성격 · 사람 표본 최초 포함) + `data/own_night_KU/`(9/1
+신규·건국대 캠퍼스·18장) — 합쳐 **`data/own_night/`로 45장**, 촬영 순 리네임
+(`own_night_0001`~`0045.jpg`) 후 라벨을 채워 `C5`에 썼다. 장면 구성·정정 내역 상세는
+→ [data.md 2-2-1](data.md).
 
 ### 4-1. 사용 / 미사용 구분 (탐지 학습·평가 파이프라인 기준)
 
@@ -383,6 +393,8 @@
 
 | 항목 | 결과 | 원문 |
 |---|---|---|
+| ★ **6종 성능·용량 비교 — `own_night_arc` 45장** (9/1) | `c4d_11n_640`·`c4e_s3_11n`(FP32/INT8)·`c4f_11s_640_teacher`·`c4f_distill_11n_640`(FP32/INT8) 6종을 45장 고정 스냅샷에서 같은 자로 비교(`scripts/eval_own_night.py` 재사용, 신규 계산은 용량 축뿐 — **`.pt`가 아니라 실제 배포 ONNX 크기**로 잰다). mAP50은 `c4e_s3_11n`(0.327) 1등, 운영점 recall/F1은 교사(0.412/0.429)가 1등이나 ONNX 용량이 나머지의 3.6배(36.17MB vs ~10.1MB). INT8 압축비는 두 계보 모두 3.37x(10.11MB→3.00MB). own_night 도메인에서 교사>학생 방향은 이번에도 유지 — rec34(학생 우세)와의 순위 역전은 **여전히 미해결**(`C11` 대기). `stairs` recall 은 전 6종 0~0.056로 사실상 0 — 원거리 계단 표본을 넣었는데도 recall 이 안 올라, "표본 부재"가 아니라 "표본이 있어도 못 잡는다"쪽 근거로 이동 | [detection.md 9-11](detection.md) · `notebooks/c5_own_night_arc_6way_compare.ipynb` |
+| ★ **`own_night_KU` 병합 — 27→45장, 촬영순 리네임 + 신규 18장 라벨링** (9/1) | `data/own_night_KU/`(건국대 캠퍼스 신규 촬영 18장)를 기존 27장과 합쳐 `own_night_0001`~`0045.jpg`로 일괄 리네임(`scripts/merge_own_night.py`, 매핑은 `data/own_night/manifest.csv`). 원본 3개 raw 폴더는 손대지 않음. 신규 18장은 기존과 같은 방식(육안 근사 라벨)으로 `person`/`stairs`/`bollard` bbox 채움 — `C3` 정식 라벨링은 여전히 미대체. ⚠️ 이 작업 중 **cv2 vs 뷰어 방향 불일치 함정을 확인**(`cv2.imread`는 EXIF 방향을 자동 반영해 세워 읽지만 일부 뷰어는 원본 그대로 보여줌 — 라벨은 반드시 `cv2` 프레임 기준이어야 함, 기존 27장도 소급 확인 완료). QA(`label_stats.py`)는 여전히 `height<32px ≈ 0%`로 원거리 계단 표본 부재 재확인 | `scripts/merge_own_night.py` · [data.md 2-2-1](data.md) |
 | ★ **DL 파트 발표용 시각화 노트북 신설** (9/1) | 학습곡선(`c4b_loli0`·`c4e_s3_11n`)·증류 teacher/student 학습곡선(RunPod라 로컬에 없던 `results.png`는 `results.csv`에서 `ultralytics.utils.plotting.plot_results`로 재생성)·`own_night` vs `rec34` 순위 역전 비교(`rec34` PR curve 포함)·후보 4종 예측 비교 5장·증류 학생 예측/GT 7장을 `notebooks/dl_presentation_summary.ipynb` 한 곳에 큐레이션. 두 리뷰 노트북(`c5_own_night_review.ipynb`·`c4f_distill_test_real_viz.ipynb`)은 재실행 없이 이미 저장된 출력만 디코드해 재사용(`scripts/build_presentation_assets.py`). **`.gitignore` 정책 변경** — `outputs/presentation/`만 예외로 git 추적하게 해 이미지가 로컬 재생성 없이도 보이도록 함(나머지 `outputs/`는 그대로 비추적) | `notebooks/dl_presentation_summary.ipynb` · `scripts/build_presentation_assets.py` |
 | ★★ **지식 증류 실행 완료 + NightOwls rec34 교차 확인 + stairs 외부 테스트셋** (8/31) | RunPod A100에서 교사(`c4f_11s_640_teacher`, mAP50 0.861)·학생(`c4f_distill_11n_640`, GPU 75% AutoBatch·100epoch 완주, mAP50 0.832) 학습 → 로컬 ONNX 변환·INT8 양자화(검출 불일치 0/7, 함정 20 재발 없음) → `C5` own_night(27장) 4자 비교 → **NightOwls rec34(1,001장·박스 1,576) 5자 재비교**(같은 날 후속, `eval_nightowls.py`에 `--device` 옵션 추가) → **stairs CC 라이선스 외부 이미지 14장(AI 라벨) 5자 재비교**(같은 날 후속). **own_night(교사 0.600>학생 0.554)과 rec34(학생 0.717>`c4e_s3_11n` 0.710>학생INT8 0.692>교사 0.689>`c4e_s3_11n`INT8 0.649) 순위가 뒤집힌다** — 표본이 큰 rec34에서는 오히려 학생이 최상위. INT8 하락 방향은 두 도메인에서 일치(학생 −0.025·`c4e_s3_11n` −0.061). stairs 외부 테스트셋은 mAP 방향이 own_night과 같으나(교사>학생) recall은 5종 전부 낮다(0.19~0.25) — 표본·라벨 정밀도 한계로 참고용. 🔴 원인 미상 · 배포 후보 확정은 아직 미룸(`C11`+`C2` 표본 확대 필요) | [runpod_distillation_20260831 5-6·5-7장](runpod_distillation_20260831.md) · `notebooks/c4f_distill_test_real_viz.ipynb` |
 | ★ **`C4e` E3 — 오염 검증 재실행, 기각 최종 확정** (8/31) | `roi_crop_eval.py`에 `detect_v3`(표준 YOLO 레이아웃) 로더 추가 → val 스플릿(400장·train 미포함)으로 재측정. `c4e_s3_11n`(val-only)·`c4d_11n_640`(이 데이터셋 자체를 학습에 안 쓴 무관 계보) 둘 다 원본과 같은 방향·비슷한 크기로 재현(union `<4px` Δ +0.193·+0.200 vs 원본 +0.220 · FP 증가 방향도 동일). **오염이 8/26 결론을 만들지 않았음을 측정으로 확인** | [detection.md 9-9-3](detection.md) |
