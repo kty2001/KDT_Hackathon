@@ -57,8 +57,14 @@ TABLE_TARGETS = [
 DISTILL_RUNS = ["c4f_11s_640_teacher", "c4f_distill_11n_640"]
 
 # (outputs/detect/ 기준 상대경로, 저장 파일명) — 학습곡선류 PNG 복사
+#
+# ⚠️ 혼동행렬 3종의 출처가 서로 다르다 — 섞어서 "같은 자"로 비교하지 말 것.
+#   · c4b_loli0/c4e_s3_11n 은 **학습 run 자체**의 val 혼동행렬(로컬 학습이라 존재)
+#   · teacher/student 는 RunPod 원격 학습이라 학습 run 에 플롯이 없다 — 대신 8/31
+#     rec34 로 로컬 재검증한 `*__rec34_labeled/` 폴더의 혼동행렬을 쓴다
 CURVE_TARGETS = [
     ("c4b_loli0/results.png", "curve_c4b_loli0_results.png"),
+    ("c4b_loli0/confusion_matrix.png", "curve_c4b_loli0_confusion_matrix.png"),
     ("c4e_s3_11n/results.png", "curve_c4e_s3_11n_results.png"),
     ("c4e_s3_11n/confusion_matrix.png", "curve_c4e_s3_11n_confusion_matrix.png"),
     ("c4e_s3_11n/BoxPR_curve.png", "curve_c4e_s3_11n_prcurve.png"),
@@ -66,6 +72,8 @@ CURVE_TARGETS = [
     ("c4f_distill_11n_640/results.png", "curve_student_results.png"),
     ("c4f_11s_640_teacher__rec34_labeled/BoxPR_curve.png", "curve_teacher_rec34_prcurve.png"),
     ("c4f_distill_11n_640__rec34_labeled/BoxPR_curve.png", "curve_student_rec34_prcurve.png"),
+    ("c4f_11s_640_teacher__rec34_labeled/confusion_matrix.png", "curve_teacher_rec34_confusion_matrix.png"),
+    ("c4f_distill_11n_640__rec34_labeled/confusion_matrix.png", "curve_student_rec34_confusion_matrix.png"),
 ]
 
 # (outputs/detect/ 기준 상대경로, 저장 파일명) — 학습곡선 PNG를 그린 원본 results.csv 복사.
