@@ -10,6 +10,8 @@
    `results.csv`에서 Ultralytics 표준 함수로 즉석 생성
 3. 위에서 생성된 것 포함, `outputs/detect/*/`에 있는 학습곡선류 PNG 8종을
    `outputs/presentation/curve_*.png`로 복사(원본은 그대로 둠 — 복사이지 이동 아님)
+4. 그 PNG를 그린 원본 `results.csv`(에폭별 loss·precision·recall·mAP)도 같은 이름 규칙으로
+   복사 — PPT 그래프 디자인이 바뀌어도 재학습 없이 raw 수치에서 다시 그릴 수 있게
 
 사용:
     uv run python scripts/build_presentation_assets.py
@@ -66,6 +68,16 @@ CURVE_TARGETS = [
     ("c4f_distill_11n_640__rec34_labeled/BoxPR_curve.png", "curve_student_rec34_prcurve.png"),
 ]
 
+# (outputs/detect/ 기준 상대경로, 저장 파일명) — 학습곡선 PNG를 그린 원본 results.csv 복사.
+# CURVE_TARGETS 의 *_results.png 4개와 1:1 대응(confusion_matrix·prcurve 는 results.csv 에서
+# 안 나오는 그림이라 대상 없음).
+CSV_TARGETS = [
+    ("c4b_loli0/results.csv", "curve_c4b_loli0_results.csv"),
+    ("c4e_s3_11n/results.csv", "curve_c4e_s3_11n_results.csv"),
+    ("c4f_11s_640_teacher/results.csv", "curve_teacher_results.csv"),
+    ("c4f_distill_11n_640/results.csv", "curve_student_results.csv"),
+]
+
 
 def load_notebook(name: str) -> dict:
     return json.loads((NOTEBOOKS / name).read_text(encoding="utf-8"))
@@ -115,13 +127,22 @@ def copy_curve_images() -> None:
         print(f"복사: {out_name}  <- outputs/detect/{rel_src}")
 
 
+def copy_curve_csvs() -> None:
+    for rel_src, out_name in CSV_TARGETS:
+        src = DETECT / rel_src
+        shutil.copy2(src, OUT_DIR / out_name)
+        print(f"복사: {out_name}  <- outputs/detect/{rel_src}")
+
+
 def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     extract_review_outputs()
     generate_distill_curves()
     copy_curve_images()
+    copy_curve_csvs()
     n_images = len(IMAGE_TARGETS) + len(CURVE_TARGETS)
-    print(f"\n완료: {OUT_DIR} 에 이미지 {n_images}개 + 표 {len(TABLE_TARGETS)}개 저장")
+    print(f"\n완료: {OUT_DIR} 에 이미지 {n_images}개 + 표 {len(TABLE_TARGETS)}개 + "
+          f"학습곡선 CSV {len(CSV_TARGETS)}개 저장")
     return 0
 
 
