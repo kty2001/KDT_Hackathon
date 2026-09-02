@@ -358,6 +358,7 @@
 |---|---|---|
 | **지금 뭘 해야 하나** (순서·병렬성·일정·담당) | [TODO.md](TODO.md) | 30KB |
 | ★ **③ 탐지 전부** — `C4`·`C4b`(3~6장) · 계단 도메인(8장) · **`C4e` S0~S3**(9·11장) · `W2` 기각(6-7) | [detection.md](detection.md) | 75KB |
+| ★ **왜 `11n`·`640`·INT8·증류인가** — FPS 예산 하나가 네 결정을 묶는 논리 정리 | [model_selection.md](model_selection.md) | 6KB |
 | ★ **앱팀 인수인계** — 3클래스 계약(출력 2→3) · **INT8 판**(7-0b) · ④ 색 · 연동 주의 | [share 7-0](share_yolo_c4b_20260803.md) | 17KB |
 | ★ **양자화 실측** — 파일 표 · FP32 정합 · **붕괴 검사**(INT8 통과 / INT4·FP8 기각) | `outputs/quantization/<pkg>/<pkg>_README.md` · FP8은 `<pkg>-FP8_experiment/result.md` | — |
 | ② 고전 arm — 지표·순위·속도·A3 시간축 | [lowlight_classical.md](lowlight_classical.md) | 51KB |
