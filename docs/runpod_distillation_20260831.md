@@ -1,5 +1,8 @@
 # RunPod 지식 증류 학습 — Pod 재접속 가이드
 
+> ✅ **2026-09-03 — 이 문서가 만든 학생 모델(`c4f_distill_11n_640` INT8)이 배포 최종
+> 채택됐다.** 최종 채택 근거·후속 재검증은 [model_selection.md 5·7·8장](model_selection.md).
+
 ## 0. 결론 요약
 
 - ✅ **지식 증류(`docs/distillation_plan_20260829.md`) 실행 완료** (2026-08-31) — 교사

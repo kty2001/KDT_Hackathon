@@ -767,9 +767,11 @@ foreach ($n in "NightOwls","LoLI-Street","Stair dataset","ExDark","LOLdataset") 
 
 #### 5-2-1. ★ 실제 학습 데이터셋 — `_derived/aihub_yolo_11k` → `_derived/detect_v3`
 
-`c4e_s3_11n`(현재 배포 후보 · → [STATUS.md](STATUS.md))이 학습한 데이터셋의 **정본 위치와
-구성**이다. 만드는 논리·설계 근거(왜 이 조합인가)는 → [detection.md 11장](detection.md),
-여기는 **무엇이 어디에 얼마나 있는가**만 다룬다.
+`c4e_s3_11n`이 학습한 데이터셋의 **정본 위치와 구성**이다. ⚠️ 최종 배포 모델은 이후
+`c4f_distill_11n_640`(→ [STATUS.md](STATUS.md))으로 바뀌었지만, 그 교사 모델도 **같은
+`detect_v3`**로 학습했으므로(→ [distillation_plan_20260829.md](distillation_plan_20260829.md))
+아래 구성은 그대로 유효하다. 만드는 논리·설계 근거(왜 이 조합인가)는 →
+[detection.md 11장](detection.md), 여기는 **무엇이 어디에 얼마나 있는가**만 다룬다.
 
 **2단계 파이프라인** — 둘 다 `D:\datasets\_derived\`에 있다(→ [STATUS 함정 14](STATUS.md),
 원본이 D: 라 C: 에 두면 하드링크가 안 걸리고 통째로 복사된다).

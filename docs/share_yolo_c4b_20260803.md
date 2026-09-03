@@ -1,7 +1,11 @@
 # [공유] ③ YOLO 위험요소 탐지 — 훈련 결과와 회의 안건 (2026-08-03)
 
+> ✅ **2026-09-03 최종 확정** — 배포 모델은 **`c4f_distill_11n_640` INT8**(증류 학생 모델)로
+> 최종 채택됐다. **인터페이스 계약은 3클래스 판(7-0)에서 바뀌지 않는다** — 파일만 교체하면
+> 된다. 앱팀은 **7-0c** 를 먼저 볼 것.
+>
 > 🔴 **2026-08-24 갱신** — **3클래스 ONNX 패키지가 나왔고 인터페이스 계약이 바뀐다**
-> (출력 `[1,6,8400]` → `[1,7,8400]`). 앱팀은 **7-0** 을 먼저 볼 것.
+> (출력 `[1,6,8400]` → `[1,7,8400]`). 아래 7-0 은 계약 변경의 원문으로 남겨 둔다.
 
 > **팀 공유용 요약본**이다. 근거·상세는 [detection.md](detection.md), 그림 실물은
 > [stairs_night_review.ipynb](../notebooks/stairs_night_review.ipynb) ·
@@ -194,9 +198,8 @@ xychart-beta
 보행 시점 실야간 음성 표본에서 `stairs` 오탐도 **6 → 5박스**(conf 0.25)로 줄었다.
 **검증됨**: PT↔ONNX 좌표 오차 **0.0001px** · 신뢰도 오차 **0** (표본 8장 / 박스 27개).
 
-⚠️ **아직 "채택 확정"이 아니다.** 최종 판정은 자체 촬영 야간 평가셋(`C5`)에서 한다 —
-현재 근거는 seed 1개이고 실야간 표본이 15프레임·볼라드 1장 규모다. **앱 연동은 계약이
-바뀌는 지점(채널 3)만 미리 맞춰 두면 되고, 가중치 교체는 판정 뒤에 해도 된다.**
+✅ **`C5` 최종 판정 완료 → 7-0c.** 배포 가중치는 이 `c4e_s3_11n`이 아니라
+**`c4f_distill_11n_640` INT8**로 바뀌었다(계약은 동일 — 파일만 교체).
 
 재생성:
 ```powershell
@@ -220,14 +223,44 @@ uv run python scripts/export_onnx.py --weights outputs/detect/c4e_s3_11n/weights
 **파일만 바꿔 끼우면 된다.** 야간 볼라드 2/2 · 계단 검출은 FP32 와 같고 음성 오탐은
 오히려 5→4박스로 줄었다(자체 야간 소재 기준).
 
-🟡 **다만 아직 채택 확정은 아니다** — 실기기에서 **NPU EP 에 그래프가 통째로 올라가는지**가
-확인되지 않았다(op 하나만 안 올라가도 CPU fallback 이라 이득이 사라진다). `C10` 이식 때
-같이 잰다. 정확도 정식 판정(mAP·recall)도 `C5` 대기다.
-
 - 판이 **둘**이다 — `..._generic.onnx`(NNAPI·Core ML·CPU EP) · `..._qnn_qdq.onnx`(스냅드래곤
   QNN). **CPU 판·GPU 판이 아니라** EP 계열이 요구하는 양자화 형식 차이다
 - 🔴 **4비트는 기각됐다** — 만들면 파일은 나오지만 야간 볼라드가 2/2 → 0/2 로 무너진다
 - 자세한 표·근거는 패키지 안 `..._README.md`
+- 🟡 **NPU EP 전체 적재·실기기 mAP 정식 판정은 여전히 `C11`/`C10` 대기** — 아래 7-0c 도 동일
+
+---
+
+### ✅ 7-0c. 최종 채택 — `c4f_distill_11n_640` INT8 (2026-09-03)
+
+`C5`(자체 촬영 야간 평가셋) 판정과 `model_selection.md` 7-8장의 재검증을 거쳐 **배포
+가중치가 `c4e_s3_11n` 에서 지식 증류 학생 모델 `c4f_distill_11n_640` 의 INT8 판으로
+바뀌었다.** 앱이 이미 7-0/7-0b 로 3클래스·INT8 계약을 맞춰 뒀다면 **고칠 것은 없다** —
+파일만 교체하면 된다.
+
+**받을 것**: `outputs/quantization/bammasil_det_c4f_distill_11n_640_640-INT8.zip`
+(모델 본체 `..._generic.onnx` 3.15 MB)
+
+| 항목 | `c4e_s3_11n` INT8(이전) | **`c4f_distill_11n_640` INT8(최종)** |
+|---|---|---|
+| 학습 방식 | 자체 3클래스 단독 학습 | **지식 증류**(교사 `c4f_11s_640_teacher` YOLO11s → 학생 YOLO11n) |
+| 입력·출력·전처리·NMS | `[1,3,640,640]` → `[1,7,8400]` · letterbox·RGB·/255 · NMS 앱 구현 | **동일 — 변경 없음** |
+| 용량 | 3.15 MB | 3.15 MB(동일 아키텍처 크기) |
+| 운영 conf | 0.25 | **0.25(동일)** |
+| own_night(41장) mAP50 | 0.560 | 0.539(계보 내 3후보 중 최저지만 채택 근거는 mAP 단독이 아님, 아래 참고) |
+
+**왜 `c4e_s3_11n` 대신 이걸 채택했나** — own_night 41장 단일 mAP50만 보면 `c4e_s3_11n`
+INT8(0.560)이 근소 우세하지만, 증류판은 (1) held-out NightOwls `rec34`에서 5종 중
+**1등**(mAP50 0.717, → 순위가 own_night과 갈리는 현상은 원인 미규명 상태로 남아 있음)
+(2) 교사 대비 정확도 손실이 적어 **용량 대비 성능**이 가장 낫다고 팀이 판단했다.
+남은 불확실성(own_night vs rec34 순위 역전, `C11` 실기기 속도)은 그대로 유효하다 —
+상세 근거는 [model_selection.md 5·7·8장](model_selection.md).
+
+```powershell
+uv run python scripts/export_onnx.py --weights outputs/detect/c4f_distill_11n_640/weights/best.pt `
+    --val-images "D:\datasets\_derived\detect_v3\images\val"
+uv run python scripts/quantize_onnx.py --onnx outputs/export/bammasil_det_c4f_distill_11n_640_640/bammasil_det_c4f_distill_11n_640_640.onnx --bits 8
+```
 
 ---
 

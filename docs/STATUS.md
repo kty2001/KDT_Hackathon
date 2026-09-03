@@ -2,21 +2,18 @@
 
 > **이 파일만 읽고 작업을 시작할 수 있게** 유지한다. 다른 문서는 *필요할 때만* 연다.
 > 작업을 끝낼 때마다 **이 파일을 먼저** 고칠 것.
-> 갱신 **2026-09-01** — **DL 파트 발표용 시각화 노트북 신설**(`notebooks/dl_presentation_summary.ipynb`
-> — 학습곡선·증류 비교·`rec34` PR curve·후보 4종 비교를 흩어진 런 폴더·리뷰 노트북 2개에서
-> 재실행 없이 큐레이션. `scripts/build_presentation_assets.py` 로 재생성). **`outputs/presentation/`만
-> `.gitignore` 예외로 git 추적**하도록 바꿔 발표 이미지가 로컬 재생성 없이도 보이게 함(나머지
-> `outputs/`는 그대로 비추적).
-> 이전(2026-08-31): **지식 증류 실행 완료**(RunPod A100, 교사·학생 학습 → ONNX →
-> INT8 → `C5` own_night 4자 비교 → 정성 노트북 → **NightOwls rec34 교차 확인**(같은 날
-> 후속) — own_night(교사>학생)과 **방향이 뒤집힌다**(rec34는 학생이 교사보다 우세) →
-> **stairs 외부 야간 테스트셋(CC 이미지 14장, AI 라벨) 1차 시도** — recall 5종 전부
-> 0.19~0.25로 낮음, 참고용. 상세 [runpod_distillation_20260831](runpod_distillation_20260831.md)
-> 5장) · `C4e` **E3 오염 검증 재실행**(clean val-only + `c4d_11n_640` 대조 —
-> 결론 재현, **ROI 크롭 기각 최종 확정**) · 2026-08-30 `C5` **1차 판정 실행**(자체
-> 27장·`c4e_s3_11n` 우세) + `eval_own_night.py` 버그 수정 · 2026-08-28 `C4e` **E3 ROI 크롭
-> 기각**(+ 배포 conf 0.35→0.25 절반 정정) · `C10a` ③ ONNX 양자화(**8비트 채택 · 4비트·FP8
-> 기각**) + **함정 20**.
+> 갱신 **2026-09-03** — **③ 배포 모델 최종 확정 — `c4f_distill_11n_640` INT8**(지식 증류
+> 학생, 3.15MB)로 `c4e_s3_11n`을 대체한다. **3클래스 입출력 계약은 동일**해 앱 연동은
+> 그대로다(→ [share 7-0c](share_yolo_c4b_20260803.md)). 근거는 own_night(41장) 5자
+> 재검증 + NightOwls `rec34` held-out 1등(→ [model_selection.md 5·7·8장](model_selection.md)) —
+> own_night 자체에서는 교사가 근소 우세하나 `rec34`(표본이 더 큰 held-out)에서 학생이
+> 앞서고 용량 대비 손실이 가장 적어 팀이 이 판을 최종으로 골랐다. **문서 전체를 이 결정
+> 기준으로 갱신·정리**했다 — 문서 지도 크기 표기 정정, 발표 QnA 문서
+> ([QnA_prepareing.md](QnA_prepareing.md)) 반영. `stairs` AP50 저조 원인도 **정량 확인**됨
+> (StairNet 학습 박스 면적 중앙값 47.5% vs 실측 보행 중 계단 3.0% — 모델이 아니라 촬영거리
+> 도메인 갭, → model_selection.md 8-5절). ⚠️ 남는 불확실성은 그대로다 — own_night↔rec34
+> 순위 역전 원인 미규명 · `C11` 실기기 속도 미측정. 이전 이력(지식 증류 실행·양자화·`C5`
+> 1·2차 판정 등)은 → [TODO.md 8장](TODO.md).
 
 야맹증 저시력자의 야간 보행을 돕는 **실시간 AI 시각보조**(스마트폰 단독).
 구조는 **표시/탐지 2경로** — 탐지는 **원본**을, 표시는 **①② 처리본**을 쓴다(↓ 1장).
@@ -46,29 +43,26 @@
 |------|--------|-------------|------|
 | ① 눈부심 억제 | `D1`(Drago) — **표시 경로 전용** · ②에 흡수 예정 | 광원 코어 250→157 @640×360 | 🗣️ 통합 여부 회의 안건 |
 | ② 저조도 개선 | **고전 CV 확정**(8/1) · 표시 경로 전용 · `D1A1+bf`+`ts` | 3축 만족 · `+ts` **+1.5ms** | ⚠️ **속도 게이트 경계**(≈20.4ms@640×360) |
-| ③ 위험요소 탐지 | **YOLO11n 단일 모델** · **입력은 원본** · 클래스 `0 person` `1 stairs` `2 bollard`(8/22 최종 확정) | ↓ 후보 표 | 🟢 **`C5` 1차 완료(8/30)** — `c4e_s3_11n` 우세 · 정식 판정은 `C2` 정규 촬영 대기 (→ [detection.md 9장](detection.md)) |
+| ③ 위험요소 탐지 | **YOLO11n 지식증류 INT8 최종 채택** — `c4f_distill_11n_640`(교사 YOLO11s→학생 YOLO11n) · **입력은 원본** · 클래스 `0 person` `1 stairs` `2 bollard`(8/22 클래스 확정 · **9/3 모델 최종 확정**) | ↓ 최종 채택 표 | ✅ **최종 확정(9/3)** (→ [model_selection.md 7-8장](model_selection.md)) |
 | ④ 선택적 강조 | 이중 스트로크 비채움 렌더 · 색 3종 확정(8/24) | 박스당 **0.5ms** · `person` 시안 `#00E6FF` · `stairs` 노랑 `#FFD700` · `bollard` 라임 `#9CFF2E` | ✅ 구현·색 확정 · 🔴 **`P1` 실기기 가독성 대기**(라임↔노랑 적록색약 근접) |
 | **파이프라인 통합** | `scripts/pipeline_demo.py` | 데스크톱 end-to-end 확인(8/2) | ✅ 사전 검증 · 앱 이식 대기 |
-| **③ 앱 전달물** | ONNX FP32 · 640 고정 · NMS 제외 · **INT8 판 동봉**(8/26) | `bammasil_det_c4e_s3_11n_640.zip` 9.20MB · 출력 **[1,7,8400]** · PT↔ONNX **0.0001px** · **INT8 3.15MB**(계약 동일) | 🔴 계약 변경 **앱팀 공지 완료**(8/24 → [share 7-0](share_yolo_c4b_20260803.md)) · 🟡 INT8 은 실기기 확인 전(`C10`) |
-| 앱 | — | — | ❌ **구현 0건** |
+| **③ 앱 전달물** | ONNX FP32 + **INT8 판(배포용)** · 640 고정 · NMS 제외 | `bammasil_det_c4f_distill_11n_640_640-INT8.zip`(`..._generic.onnx` **3.15MB**) · FP32 원본 10.61MB · 출력 **[1,7,8400]**(`c4e_s3_11n`과 계약 동일) | ✅ **최종 확정(9/3)** → [share 7-0c](share_yolo_c4b_20260803.md) · 🟡 실기기 NPU 적재·속도는 `C10`/`C11` 대기 |
+| 앱 | — | — | ❌ **구현 0건**(별도 저장소·팀원2) |
 
-**③ 후보 3개** — held-out(NightOwls rec34 · person) 기준 mAP50 / recall / `stairs` 오탐
+**③ 최종 채택 — `c4f_distill_11n_640` INT8**(2026-09-03, 근거 → [model_selection.md 5·7·8장](model_selection.md))
 
-| 런 | 수치 | 성격 |
+| 지표 | 값 | 비고 |
 |---|---|---|
-| **`c4b_loli0`** (현 배포 · 2클래스) | 0.684 / 0.609 / 0.2% | 채택 가중치 `outputs/detect/c4b_loli0/weights/best.pt` |
-| `c4d_11n_640` (인수분 · 3클래스) | 0.736 / 0.644 / 0.0% | 별개 계보 · **코드 없음** · 배포 자(square)에서 야간 볼라드 2/2→1/2 |
-| **`c4e_s3_11n`** (자체 · 3클래스) | **0.710 / 0.635 / 0.0%** | 야간 볼라드 **2/2** · 실야간 오탐 최저 · **ONNX 로 나가 있는 판** |
+| held-out(NightOwls rec34·person) mAP50 | **0.717** | 5종(교사·학생 FP32/INT8·`c4e_s3_11n` FP32) 재비교 1등 |
+| own_night(41장) mAP50/recall/F1 | 0.539 / 0.512 / 0.558 | 같은 표본에서는 교사가 근소 우세 — 아래 참고 |
+| 용량 | 10.61MB → **3.15MB**(INT8, Conv 레이어만 양자화) | 함정 20 |
+| 앱 계약 | `[1,7,8400]` | `c4e_s3_11n`과 동일 — 앱 수정 불요 |
 
-⚠️ 요약 수치는 **한 런 기준**으로 적을 것 — `c4b_loli6000`(0.691/0.625/0.0%)과 섞으면
-"오탐 0.0%" 같은 과대 표기가 된다 (→ [detection.md 6-7](detection.md)).
-
-### 🟢 `C5` 1차 판정 완료 (8/30)
-
-자체 촬영 27장(`data/own_night`)에서 `c4e_s3_11n`이 mAP·운영점·음성 오탐·볼라드 recall
-전 축 우세(FP32 mAP50 0.551 · INT8도 손실 거의 없음 0.526) — 기존 held-out 판단과 방향이
-같다. `<32px` 표본이 0장이라 **아직 최종 판정은 아니다**. 상세 표·버그 수정·노트북은
-→ [detection.md 9-10](detection.md).
+⚠️ **own_night vs rec34 순위 역전은 미해소** — own_night 41장에서는 교사(`c4f_11s_640_teacher`)가
+mAP50·F1 1등이지만, 표본이 더 크고 학습에 안 쓰인 `rec34`(1,576박스)에서는 학생이 앞선다.
+용량 대비 손실이 가장 적다는 점과 함께 팀이 학생 INT8을 최종으로 선택했다 — 원인 규명과
+`C11` 실기기 속도 측정은 남은 과제다. 이전 후보(`c4b_loli0`·`c4d_11n_640`·`c4e_s3_11n`)
+비교 원문은 → [detection.md 9장](detection.md).
 
 ---
 
@@ -76,6 +70,9 @@
 
 > 번호 없는 절이다. 다른 문서가 `R1`~`R5` 로 참조하므로 **소절 제목을 유지**한다.
 > 📦 원문(6런 표·오류 사례·경위)은 [archive/received_c4d_2026-08-07.md](archive/received_c4d_2026-08-07.md).
+> ⚠️ **`received/` 원본 파일(27개, CSV·PNG·README)은 판정 종료 후 저장소에서 삭제됐다**
+> (9/3) — 결론은 위 archive 문서에 요약돼 있으나, `detection.md`·`review_proposal_v20` 등이
+> 인용하는 원본 CSV·PNG 경로(`received/bammasil_docs/...`)는 더 이상 존재하지 않는다.
 
 별도 환경의 **`C4d` 3클래스 6런 비교**. 우리 `c4b_*` 와 **별개 계보**(11K 축소셋)이고
 **코드는 오지 않았다**(표·CSV·가중치만). 가중치는 `outputs/bammasil_results/bammasil_weights/c4d_*/`.
@@ -116,12 +113,12 @@
 ⚠️ 남는 것 — 코드가 없어 **재현 불가** · 인수분 안에서도 `results.csv` ≠ `benchmark_c4d.csv` ·
 **셋 다 seed 1개**라 최종 판정은 `C5` · **실기기 속도 미측정**이라 **배포 해상도 640 유지**.
 
-### R5. 회신 대기 3건 (→ `received/README.md` 10장)
+### R5. ✅ 종결 — 회신 대기 3건은 자체 판정으로 대체됐다
 
-1. 🔴 **야간 데이터셋 사양** — 보낸 쪽이 당일 촬영·라벨링 가능하다고 했다.
-   **우리 `C2` 와 정면으로 겹친다 — 같은 밤을 두 번 찍지 않도록 분업부터 정할 것.**
-2. **ONNX 로 넘길 비교축 런 지정** — ⚠️ YOLO26n 은 NMS-free 라 **앱 계약이 바뀐다**
-3. **KPI 비교표** — 실기기 640 계측(p50 32.7 · p95 38.1ms · 11분)이 나오면 960·26n 과 대조
+야간 데이터셋 사양·ONNX 비교축·KPI 비교표를 외부 회신으로 기다리던 안건이었으나,
+`C2` 자체 촬영과 `C5`/`model_selection.md` 재검증으로 **자체 판정이 먼저 끝나** 무의미해졌다.
+`received/`(9/3 삭제, 원문은 [archive/received_c4d_2026-08-07.md](archive/received_c4d_2026-08-07.md))
+와의 외부 협업 스레드는 여기서 닫는다.
 
 ---
 
@@ -271,7 +268,7 @@
       `0.0%` 로 보이지 않게** README 렌더도 고쳤다. ⚠️ c4d 를 내보낼 일이 생기면 먼저 등록할 것.
     - 🔴 **남은 하나 — 배포 계약의 conf 가 단일 스칼라**(`export_onnx.py`). 클래스별 conf 를
       채택하면 dict 로 바뀌고 README 후처리 절차도 같이 고쳐야 하며 **앱팀 공지 대상**이다.
-      🆕 단 `c4e_s3_11n` 을 쓰는 한 손댈 일이 없다(야간 볼라드 conf 0.759~0.843).
+      🆕 최종 채택된 `c4f_distill_11n_640`도 단일 conf(0.25) 계약 그대로라 손댈 일이 없다.
 17. ★★ **세션 키에 '그룹'을 넣지 말 것 — 누수가 "누수 0" 으로 보고된다** (8/23 실측).
     `bammasil_aihub_subset` 의 그룹 폴더는 무효 필드 `is_night`(→ 13) 기반이라 **같은 촬영
     세션이 그룹마다 쪼개져 있다**(블록 2,296개 중 **1,357개(59%)가 여러 그룹에 걸친다**).
@@ -356,22 +353,22 @@
 
 | 알고 싶은 것 | 문서 | 크기 |
 |---|---|---|
-| **지금 뭘 해야 하나** (순서·병렬성·일정·담당) | [TODO.md](TODO.md) | 30KB |
-| ★ **③ 탐지 전부** — `C4`·`C4b`(3~6장) · 계단 도메인(8장) · **`C4e` S0~S3**(9·11장) · `W2` 기각(6-7) | [detection.md](detection.md) | 75KB |
-| ★ **왜 `11n`·`640`·INT8·증류인가** — FPS 예산 하나가 네 결정을 묶는 논리 정리 | [model_selection.md](model_selection.md) | 6KB |
-| ★ **앱팀 인수인계** — 3클래스 계약(출력 2→3) · **INT8 판**(7-0b) · ④ 색 · 연동 주의 | [share 7-0](share_yolo_c4b_20260803.md) | 17KB |
+| **지금 뭘 해야 하나** (순서·병렬성·일정·담당) | [TODO.md](TODO.md) | 36KB |
+| ★ **③ 탐지 전부** — `C4`·`C4b`(3~6장) · 계단 도메인(8장) · **`C4e` S0~S3**(9·11장) · `W2` 기각(6-7) | [detection.md](detection.md) | 96KB |
+| ★ **왜 `11n`·`640`·INT8·증류인가** — FPS 예산 하나가 네 결정을 묶는 논리 정리 · **7장 최종 후보 명세**(`c4f_distill_11n_640` INT8) · **8장 own_night 41장 5자 재검증 + `stairs` 스케일 갭 정량분석**(9/2) | [model_selection.md](model_selection.md) | 28KB |
+| ★ **앱팀 인수인계** — 3클래스 계약(출력 2→3) · INT8 판(7-0b) · **최종 채택 모델 교체**(7-0c) · ④ 색 · 연동 주의 | [share 7-0c](share_yolo_c4b_20260803.md) | 20KB |
 | ★ **양자화 실측** — 파일 표 · FP32 정합 · **붕괴 검사**(INT8 통과 / INT4·FP8 기각) | `outputs/quantization/<pkg>/<pkg>_README.md` · FP8은 `<pkg>-FP8_experiment/result.md` | — |
-| ② 고전 arm — 지표·순위·속도·A3 시간축 | [lowlight_classical.md](lowlight_classical.md) | 51KB |
-| 데이터 상세 · **AIHub**(3-1) · 계단 방식 근거 · 데이터 위치(5-2) | [data.md](data.md) | 61KB |
+| ② 고전 arm — 지표·순위·속도·A3 시간축 | [lowlight_classical.md](lowlight_classical.md) | 52KB |
+| 데이터 상세 · **AIHub**(3-1) · 계단 방식 근거 · 데이터 위치(5-2) | [data.md](data.md) | 68KB |
 | 기획(배경·구성·일정) · 환경 셋업 | [../README.md](../README.md) | 24KB |
-| 모바일 런타임·양자화 전략·FPS 병목 · 프레임 스킵 | [hardware_inference.md](hardware_inference.md) | 10KB |
-| 스크립트가 뭘 하는지 | [../scripts/README.md](../scripts/README.md) | 8KB |
-| ★ **`stairs` 라벨을 어떻게 치는가** (`C3` 작업자용) | [labeling_stairs.md](labeling_stairs.md) | 10KB |
-| ★ **외부 리뷰 회신** — 실증 4단 · 계단 오탐 3겹 · 작은 볼라드 & distillation | [review_response_20260825](review_response_20260825.md) | 17KB |
-| ✅ **지식 증류 실행 완료** — 학습·ONNX·INT8·`C5` 비교 결과 · 🔴 rec34 교차 확인 남음 | [runpod_distillation_20260831](runpod_distillation_20260831.md) | 6KB |
-| ★ **기획서 v20 수치 검증** — 수정 필요 9건 (미반영) | [review_proposal_v20](review_proposal_v20_20260808.md) | 19KB |
-| 외부 인수분 1차 자료 (회신 요청 10장) | [../received/README.md](../received/README.md) | 15KB |
-| 종결된 실험·결정 원문 — **인수분 `C4d` 원문 포함** | [archive/](archive/) | — |
+| 모바일 런타임·양자화 전략·FPS 병목 · 프레임 스킵 | [hardware_inference.md](hardware_inference.md) | 12KB |
+| 스크립트가 뭘 하는지 | [../scripts/README.md](../scripts/README.md) | 12KB |
+| ★ **`stairs` 라벨을 어떻게 치는가** (`C3` 작업자용) | [labeling_stairs.md](labeling_stairs.md) | 12KB |
+| ★ **외부 리뷰 회신** — 실증 4단 · 계단 오탐 3겹 · 작은 볼라드 & distillation | [review_response_20260825](review_response_20260825.md) | 20KB |
+| ✅ **지식 증류 실행 완료** — 학습·ONNX·INT8·`C5` 비교 결과 · **rec34 교차 확인 완료(순위 역전 미해결)** · 학생 INT8 이 `model_selection.md` 7장 최종 후보 | [runpod_distillation_20260831](runpod_distillation_20260831.md) | 28KB |
+| ★ **기획서 v20 수치 검증** — 수정 필요 9건 (미반영) | [review_proposal_v20](review_proposal_v20_20260808.md) | 20KB |
+| ★ **발표 예상 QnA** — 스토리보드 미언급 항목 우선순위별 정리(모델·데이터·접근성·사업성) | [QnA_prepareing.md](QnA_prepareing.md) | 16KB |
+| 종결된 실험·결정 원문 — **인수분 `C4d` 원문 포함**(원본 `received/`는 9/3 삭제, 요약이 이 안에 있음) | [archive/](archive/) | — |
 
 **노트북 — 판정을 그림으로 확인할 때**
 
@@ -399,6 +396,8 @@
 
 | 항목 | 결과 | 원문 |
 |---|---|---|
+| ★★★ **③ 배포 모델 최종 확정 — `c4f_distill_11n_640` INT8** (9/3) | `c4e_s3_11n`을 대체해 최종 배포 모델로 확정. 3클래스 입출력 계약 `[1,7,8400]`은 동일해 앱 쪽 변경 불요, 파일만 교체(`bammasil_det_c4f_distill_11n_640_640-INT8_generic.onnx` 3.15MB). 근거는 held-out `rec34`(mAP50 0.717, 5종 중 1등) + own_night(41장, 교사가 근소 우세하나 용량 대비 손실 최소) — own_night↔rec34 순위 역전은 원인 미규명으로 남아 있음. 문서 전체(STATUS·TODO·share·model_selection)를 이 결정 기준으로 정리 | [share 7-0c](share_yolo_c4b_20260803.md) · [model_selection.md 5·7·8장](model_selection.md) |
+| ★★ **`model_selection.md` 확장 — 최종 후보 명세 + own_night 41장 5자 재검증 + `stairs` 스케일 갭 정량분석** (9/2) | 6KB → 452행 확장. **7장**: `c4f_distill_11n_640` INT8(3.15MB)의 모델·양자화·성능 스펙을 한 곳에 정리(입출력 계약은 `c4e_s3_11n`과 동일해 앱 쪽 변경 불요). **8장**: 로컬에 있는 5개 후보(교사·학생 FP32/INT8·`c4e_s3_11n` FP32/INT8)를 own_night 41장에서 한 하네스로 재비교 — mAP50·F1 은 교사가 여전히 1등(`rec34`와의 순위 역전은 미해소) · **`stairs` AP50 저조 원인을 처음으로 정량화**: `data/own_night` stairs 21박스를 직접 파싱해 면적 비율 실측, StairNet 학습 박스(중앙값 47.5%, 근접샷)와 실제 보행 중 계단(중앙값 3.0%, 71%가 프레임의 10% 미만)의 스케일 격차를 수치로 확인 — 모델·라벨 품질이 아니라 **학습·실사용 도메인의 촬영 거리 갭**이 병목이라는 기존 정성적 결론을 실측으로 뒷받침. ⚠️ ONNX·INT8 세 모델은 9/1 문서 기록치와 최대 0.032 어긋나 재현 시 SHA256·라벨 버전 대조 필요(8-4절) | [model_selection.md 7-8장](model_selection.md) |
 | ★★ **6종 재비교 + 속도 축 — `own_night` 41장(재라벨링 후)** (9/1) | 사용자가 45장 중 4장(`0003/0022/0036/0037`) 삭제 + 남은 41장 재라벨링(구 라벨은 `data/own_night/labels/_backup/`에 보존) 후 6종 재비교. **재라벨링으로 mAP50이 전 모델 0.29~0.33 → 0.51~0.59로 크게 올랐다** — 라벨 품질이 최대 병목이었다는 뜻. `stairs` mAP50도 0.02~0.04 → 0.08~0.20으로 개선(그래도 최저). 교사가 mAP50·운영점 전부 1등으로 확정(45장에서는 mAP50 3등이었다). **신규: 속도 축** — `scripts/quantize_onnx.py::bench_cpu()` 재사용(이 PC 참고치, `C11` 전엔 절대치 아님). 🔴 **INT8이 이 CPU에서 오히려 더 느리다**(c4e 41→62ms · student 44→75ms, 이 하드웨어에 INT8 가속 경로가 없어서) — 용량 절감(3.37x)과 속도는 별개 축임을 확인. `eval_own_night.py`의 `build_val()`이 `--rebuild`에도 대상 폴더를 안 비워 과거 산출물과 섞여 45+27=72장으로 오염되는 함정 발견(수동으로 dst 삭제 후 재실행) · `uv add --dev` 직후 `onnxruntime-gpu` 설치가 깨지는 현상 발견(`uv sync --reinstall-package`로 복구) | [detection.md 9-12](detection.md) · `notebooks/c5_own_night_6way_compare.ipynb` |
 | ★ **6종 성능·용량 비교 — `own_night_arc` 45장** (9/1) | `c4d_11n_640`·`c4e_s3_11n`(FP32/INT8)·`c4f_11s_640_teacher`·`c4f_distill_11n_640`(FP32/INT8) 6종을 45장 고정 스냅샷에서 같은 자로 비교(`scripts/eval_own_night.py` 재사용, 신규 계산은 용량 축뿐 — **`.pt`가 아니라 실제 배포 ONNX 크기**로 잰다, 단위는 십진 MB). mAP50은 `c4e_s3_11n`(0.327) 1등, 운영점 recall/F1은 교사(0.412/0.429)가 1등이나 ONNX 용량이 나머지의 3.6배(37.93MB vs ~10.6MB). INT8 압축비는 두 계보 모두 3.37x(10.61MB→3.15MB). own_night 도메인에서 교사>학생 방향은 이번에도 유지 — rec34(학생 우세)와의 순위 역전은 **여전히 미해결**(`C11` 대기). `stairs` recall 은 전 6종 0~0.056로 사실상 0 — 원거리 계단 표본을 넣었는데도 recall 이 안 올라, "표본 부재"가 아니라 "표본이 있어도 못 잡는다"쪽 근거로 이동. ⚠️ 이 45장 스냅샷은 `own_night_arc` 고정본 — 원본 `data/own_night`는 이후 41장으로 편집됨(→ 위 행) | [detection.md 9-11](detection.md) · `notebooks/c5_own_night_arc_6way_compare.ipynb` |
 | ★ **`own_night_KU` 병합 — 27→45장, 촬영순 리네임 + 신규 18장 라벨링** (9/1) | `data/own_night_KU/`(건국대 캠퍼스 신규 촬영 18장)를 기존 27장과 합쳐 `own_night_0001`~`0045.jpg`로 일괄 리네임(`scripts/merge_own_night.py`, 매핑은 `data/own_night/manifest.csv`). 원본 3개 raw 폴더는 손대지 않음. 신규 18장은 기존과 같은 방식(육안 근사 라벨)으로 `person`/`stairs`/`bollard` bbox 채움 — `C3` 정식 라벨링은 여전히 미대체. ⚠️ 이 작업 중 **cv2 vs 뷰어 방향 불일치 함정을 확인**(`cv2.imread`는 EXIF 방향을 자동 반영해 세워 읽지만 일부 뷰어는 원본 그대로 보여줌 — 라벨은 반드시 `cv2` 프레임 기준이어야 함, 기존 27장도 소급 확인 완료). QA(`label_stats.py`)는 여전히 `height<32px ≈ 0%`로 원거리 계단 표본 부재 재확인 | `scripts/merge_own_night.py` · [data.md 2-2-1](data.md) |
